@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Arimo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-bw-blue: #037ac5;
+  --color-bw-blue-hi: #048ce2;
+  --color-bw-blue-50: #eaf6fd;
+  --color-bw-blue-100: #d3ecf9;
+  --color-bw-blue-200: #a8d9f3;
+  --color-bw-blue-700: #0363a0;
+  --color-bw-blue-900: #0a466a;
+
+  --color-bw-red: #c10841;
+  --color-bw-red-50: #fceef2;
+  --color-bw-red-100: #f8d8e0;
+
+  --color-bw-ink: #1e1e1e;
+  --color-bw-ink-2: #2b2b2b;
+  --color-bw-muted: #7f7f7f;
+  --color-bw-line: #e1e1e1;
+  --color-bw-surface: #f7f7f7;
+  --color-bw-canvas: #f2f2f2;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-bw-canvas text-bw-ink antialiased;
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: #037ac5;
+    color: #ffffff;
+  }
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes bw-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.bw-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: bw-marquee 22s linear infinite;
+  will-change: transform;
+}
+
+.bw-marquee:hover .bw-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bw-marquee-track {
+    animation: none;
+  }
+}
