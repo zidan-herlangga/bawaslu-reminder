@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { KATEGORI_OPTIONS } from '../constants/options';
+import { DIVISI_OPTIONS, KATEGORI_OPTIONS } from '../constants/options';
 import useSession from '../hooks/useSession';
 import fetchProfile from '../lib/fetchProfile';
+import { getSlots } from '../lib/slots';
 
 const EMPTY_SLOT = { mulai: '', selesai: '' };
 
@@ -11,8 +12,15 @@ const EMPTY_FORM = {
   judul: '',
   kategori: KATEGORI_OPTIONS[0],
   deskripsi: '',
+  target_mode: 'semua',
+  target_divisi: '',
   slots: [{ ...EMPTY_SLOT }],
 };
+
+const TARGET_MODES = [
+  { value: 'semua', label: 'Semua staf', hint: 'Pengingat dikirim ke seluruh staf.' },
+  { value: 'divisi', label: 'Khusus divisi', hint: 'Hanya staf pada divisi terpilih.' },
+];
 
 const FIELD_BASE_CLASS =
   'block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-bw-surface';
@@ -23,6 +31,16 @@ const LABEL_CLASS = 'mb-1.5 block text-[13px] font-semibold text-bw-ink';
 const SUB_LABEL_CLASS = 'mb-1 block text-[11px] font-semibold text-bw-muted';
 
 const SLOT_ERROR_KEY = /^slot-\d+-(mulai|selesai)$/;
+
+function toLocalInput(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
 
 function getErrorMessage(error) {
   const raw = error?.message ?? '';
@@ -69,6 +87,10 @@ function validate(values) {
     nextErrors.deskripsi = 'Deskripsi maksimal 1000 karakter.';
   }
 
+  if (values.target_mode === 'divisi' && !values.target_divisi) {
+    nextErrors.target_divisi = 'Pilih divisi penerima pengingat.';
+  }
+
   if (values.slots.length === 0) {
     nextErrors.slots = 'Tambahkan minimal satu tanggal dan jam.';
     return nextErrors;
@@ -110,6 +132,8 @@ function FieldError({ id, children }) {
 
 export default function ScheduleForm() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = Boolean(id);
   const { session, loading } = useSession();
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -117,6 +141,16 @@ export default function ScheduleForm() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(() => isEdit);
+  const [detailError, setDetailError] = useState('');
+
+  useEffect(() => {
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setFormError('');
+    setDetailError('');
+    setDetailLoading(Boolean(id));
+  }, [id]);
 
   useEffect(() => {
     if (!session) return;
@@ -130,6 +164,56 @@ export default function ScheduleForm() {
       active = false;
     };
   }, [session]);
+
+  useEffect(() => {
+    if (!session || !id) return;
+    let active = true;
+
+    const loadDetail = async () => {
+      setDetailLoading(true);
+      setDetailError('');
+
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!active) return;
+
+      if (error) {
+        setDetailError(`Gagal memuat jadwal. Detail: ${error.message}.`);
+      } else if (!data) {
+        setDetailError('Jadwal tidak ditemukan atau sudah dihapus.');
+      } else if (data.pembuat_id !== session.user.id) {
+        setDetailError('Anda bukan pembuat jadwal ini, jadi tidak bisa mengubahnya.');
+      } else {
+        const slots = getSlots(data);
+        setForm({
+          judul: data.judul ?? '',
+          kategori: data.kategori ?? KATEGORI_OPTIONS[0],
+          deskripsi: data.deskripsi ?? '',
+          target_mode: data.target_divisi ? 'divisi' : 'semua',
+          target_divisi: data.target_divisi ?? '',
+          slots:
+            slots.length > 0
+              ? slots.map((slot) => ({
+                  mulai: toLocalInput(slot.mulai),
+                  selesai: slot.selesai ? toLocalInput(slot.selesai) : '',
+                }))
+              : [{ ...EMPTY_SLOT }],
+        });
+      }
+
+      setDetailLoading(false);
+    };
+
+    loadDetail();
+
+    return () => {
+      active = false;
+    };
+  }, [session, id]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -198,32 +282,53 @@ export default function ScheduleForm() {
         .filter((slot) => slot.selesai)
         .map((slot) => new Date(slot.selesai).getTime());
 
-      const { error } = await supabase.from('schedules').insert({
-        pembuat_id: session.user.id,
-        pembuat_nama: profile?.nama_lengkap || session.user.email,
-        pembuat_divisi: profile?.divisi || 'Belum diatur',
+      const payload = {
         judul: form.judul.trim(),
         deskripsi: form.deskripsi.trim(),
         kategori: form.kategori,
+        target_divisi: form.target_mode === 'divisi' ? form.target_divisi : null,
         waktu_mulai: new Date(Math.min(...startTimes)).toISOString(),
         waktu_selesai: endTimes.length
           ? new Date(Math.max(...endTimes)).toISOString()
           : null,
         slots,
-      });
+      };
+
+      const query = isEdit
+        ? supabase.from('schedules').update(payload).eq('id', id).select('id')
+        : supabase.from('schedules')
+            .insert({
+              ...payload,
+              pembuat_id: session.user.id,
+              pembuat_nama: profile?.nama_lengkap || session.user.email,
+              pembuat_divisi: profile?.divisi || 'Belum diatur',
+            })
+            .select('id');
+
+      const { data, error } = await query;
 
       if (error) throw error;
+      if (!data?.length) {
+        throw new Error(
+          isEdit
+            ? 'Perubahan tidak tersimpan (0 baris terpengaruh). Jalankan lagi supabase/schema.sql di SQL Editor Supabase.'
+            : 'Jadwal tidak tersimpan (0 baris terpengaruh). Jalankan lagi supabase/schema.sql di SQL Editor Supabase.'
+        );
+      }
 
-      console.info('[Schedule] jadwal tersimpan, kembali ke /');
+      console.info(`[Schedule] jadwal ${isEdit ? 'diperbarui' : 'tersimpan'}, kembali ke /`);
       navigate('/', { replace: true });
     } catch (error) {
       console.error('[Schedule] gagal:', error?.code, error?.message);
-      setFormError(getErrorMessage(error));
+      const hint = /target_divisi|schema cache|could not find/i.test(error?.message ?? '')
+        ? ' Jalankan lagi supabase/schema.sql (bagian 7 target_divisi & notifikasi) di SQL Editor Supabase.'
+        : '';
+      setFormError(getErrorMessage(error) + hint);
       setIsSubmitting(false);
     }
   };
 
-  if (loading) {
+  if (loading || detailLoading) {
     return <p className="py-10 text-center text-sm text-bw-muted">Memuat sesi...</p>;
   }
 
@@ -235,18 +340,39 @@ export default function ScheduleForm() {
     );
   }
 
+  if (detailError) {
+    return (
+      <div className="mx-auto w-full max-w-sm space-y-3">
+        <div
+          role="alert"
+          className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+        >
+          {detailError}
+        </div>
+        <Link
+          to="/"
+          className="flex items-center justify-center rounded-lg border border-bw-line bg-white px-4 py-3 text-sm font-semibold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue"
+        >
+          Kembali ke beranda
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-sm">
       <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
         <div className="border-b border-bw-line pb-4">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-bw-red">
-            Jadwal Baru
+            {isEdit ? 'Ubah Jadwal' : 'Jadwal Baru'}
           </p>
-          <h1 className="mt-1 text-lg font-bold leading-snug text-bw-ink">Buat Jadwal</h1>
-          <p className="mt-1 text-xs leading-relaxed text-bw-muted">
-            Satu jadwal boleh punya banyak tanggal & jam. Seluruh pengguna dapat melihat
-            jadwal ini.
-          </p>
+          <h1 className="mt-1 text-lg font-bold leading-snug text-bw-ink">
+            {isEdit ? 'Edit Jadwal' : 'Buat Jadwal'}
+          </h1>
+            <p className="mt-1 text-xs leading-relaxed text-bw-muted">
+              Satu jadwal boleh punya banyak tanggal &amp; jam. Seluruh pengguna dapat melihat
+              jadwal ini, tetapi pengingat bisa dibatasi hanya untuk satu divisi.
+            </p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
@@ -296,6 +422,64 @@ export default function ScheduleForm() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <span className={LABEL_CLASS}>Penerima Pengingat</span>
+            <div className="grid grid-cols-2 gap-2">
+              {TARGET_MODES.map((mode) => (
+                <label
+                  key={mode.value}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors focus-within:ring-2 focus-within:ring-bw-blue/40 ${
+                    form.target_mode === mode.value
+                      ? 'border-bw-blue bg-bw-blue-50'
+                      : 'border-bw-line bg-white hover:border-bw-blue-200'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="target_mode"
+                    value={mode.value}
+                    checked={form.target_mode === mode.value}
+                    onChange={handleChange}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-bw-blue"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[12px] font-bold text-bw-ink">{mode.label}</span>
+                    <span className="mt-0.5 block text-[10px] leading-snug text-bw-muted">
+                      {mode.hint}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {form.target_mode === 'divisi' && (
+              <div className="mt-2.5">
+                <label htmlFor="target_divisi" className={SUB_LABEL_CLASS}>
+                  Divisi Penerima
+                </label>
+                <select
+                  id="target_divisi"
+                  name="target_divisi"
+                  value={form.target_divisi}
+                  onChange={handleChange}
+                  aria-invalid={Boolean(errors.target_divisi)}
+                  aria-describedby={errors.target_divisi ? 'target_divisi-error' : undefined}
+                  className={`${FIELD_BASE_CLASS} ${
+                    errors.target_divisi ? FIELD_INVALID_CLASS : FIELD_OK_CLASS
+                  } ${form.target_divisi ? '' : 'text-bw-muted'}`}
+                >
+                  <option value="">-- Pilih Divisi --</option>
+                  {DIVISI_OPTIONS.map((option) => (
+                    <option key={option} value={option} className="text-bw-ink">
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <FieldError id="target_divisi-error">{errors.target_divisi}</FieldError>
+              </div>
+            )}
           </div>
 
           <div>
@@ -431,7 +615,7 @@ export default function ScheduleForm() {
               disabled={isSubmitting}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-bw-blue px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-1 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none"
             >
-              {isSubmitting ? 'Menyimpan...' : 'Simpan Jadwal'}
+              {isSubmitting ? 'Menyimpan...' : isEdit ? 'Simpan Perubahan' : 'Simpan Jadwal'}
             </button>
             <Link
               to="/"

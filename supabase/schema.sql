@@ -171,16 +171,169 @@ create policy "delete own schedule"
 --   for each row execute function public.handle_new_user();
 
 -- =====================================================================
--- 6. Refresh schema cache PostgREST + verifikasi
+-- 6. Tabel todo (daftar tugas) - pribadi per akun
+-- =====================================================================
+
+create table if not exists public.todos (
+  id          uuid primary key default gen_random_uuid(),
+  pemilik_id  uuid not null references auth.users (id) on delete cascade,
+  teks        text not null check (length(trim(teks)) between 1 and 300),
+  tanggal     date not null default ((now() at time zone 'Asia/Jakarta')::date),
+  selesai     boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists todos_pemilik_tanggal_idx
+  on public.todos (pemilik_id, tanggal);
+
+alter table public.todos enable row level security;
+
+-- 6a. Pengguna hanya boleh membaca todo miliknya sendiri
+drop policy if exists "read own todos" on public.todos;
+create policy "read own todos"
+  on public.todos for select
+  to authenticated
+  using (auth.uid() = pemilik_id);
+
+-- 6b. Pengguna hanya boleh menambah todo miliknya sendiri
+drop policy if exists "insert own todo" on public.todos;
+create policy "insert own todo"
+  on public.todos for insert
+  to authenticated
+  with check (auth.uid() = pemilik_id);
+
+-- 6c. Pengguna hanya boleh mengubah todo miliknya sendiri
+drop policy if exists "update own todo" on public.todos;
+create policy "update own todo"
+  on public.todos for update
+  to authenticated
+  using (auth.uid() = pemilik_id)
+  with check (auth.uid() = pemilik_id);
+
+-- 6d. Pengguna hanya boleh menghapus todo miliknya sendiri
+drop policy if exists "delete own todo" on public.todos;
+create policy "delete own todo"
+  on public.todos for delete
+  to authenticated
+  using (auth.uid() = pemilik_id);
+
+-- =====================================================================
+-- 7. Target notifikasi jadwal, tabel notifikasi, dan langganan Web Push
+-- =====================================================================
+
+-- 7a. Penerima pengingat. NULL = semua staf. Kolom lama otomatis NULL.
+alter table public.schedules
+  add column if not exists target_divisi text;
+
+-- 7b. Notifikasi in-app: satu baris per penerima (fan-out).
+-- Tidak ada kebijakan INSERT: hanya service role (Vercel Function) yang boleh
+-- menulis, supaya staf tidak bisa mengirim notifikasi sembarangan.
+create table if not exists public.notifications (
+  id            uuid primary key default gen_random_uuid(),
+  jadwal_id     uuid references public.schedules (id) on delete cascade,
+  pengirim_id   uuid not null references auth.users (id) on delete cascade,
+  penerima_id   uuid not null references auth.users (id) on delete cascade,
+  judul         text not null check (length(trim(judul)) between 1 and 150),
+  pesan         text not null check (length(trim(pesan)) between 1 and 500),
+  target_divisi text,
+  dibaca        boolean not null default false,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists notifications_penerima_idx
+  on public.notifications (penerima_id, dibaca, created_at desc);
+
+alter table public.notifications enable row level security;
+
+-- 7b-i. Penerima hanya boleh membaca notifikasinya sendiri
+drop policy if exists "read own notifications" on public.notifications;
+create policy "read own notifications"
+  on public.notifications for select
+  to authenticated
+  using (auth.uid() = penerima_id);
+
+-- 7b-ii. Penerima hanya boleh menandai notifikasinya sendiri
+drop policy if exists "update own notifications" on public.notifications;
+create policy "update own notifications"
+  on public.notifications for update
+  to authenticated
+  using (auth.uid() = penerima_id)
+  with check (auth.uid() = penerima_id);
+
+-- 7b-iii. Penerima hanya boleh menghapus notifikasinya sendiri
+drop policy if exists "delete own notifications" on public.notifications;
+create policy "delete own notifications"
+  on public.notifications for delete
+  to authenticated
+  using (auth.uid() = penerima_id);
+
+-- 7c. Langganan Web Push per perangkat (endpoint FCM/Mozilla + kunci rahasia)
+create table if not exists public.push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists push_subscriptions_user_idx
+  on public.push_subscriptions (user_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "read own push subscriptions" on public.push_subscriptions;
+create policy "read own push subscriptions"
+  on public.push_subscriptions for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "insert own push subscriptions" on public.push_subscriptions;
+create policy "insert own push subscriptions"
+  on public.push_subscriptions for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "update own push subscriptions" on public.push_subscriptions;
+create policy "update own push subscriptions"
+  on public.push_subscriptions for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "delete own push subscriptions" on public.push_subscriptions;
+create policy "delete own push subscriptions"
+  on public.push_subscriptions for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- =====================================================================
+-- 8. Refresh schema cache PostgREST + verifikasi
 -- =====================================================================
 
 notify pgrst, 'reload schema';
 
--- Verifikasi 1: kolom slots harus muncul di daftar.
+-- Verifikasi 1: kolom slots + target_divisi harus muncul di daftar.
 select column_name, data_type, is_nullable
 from information_schema.columns
 where table_schema = 'public' and table_name = 'schedules'
 order by ordinal_position;
 
--- Verifikasi 2: harus mengembalikan 200 / daftar kosong, bukan error 42703.
--- select id, judul, slots from public.schedules limit 1;
+-- Verifikasi 2: kolom todos harus muncul di daftar.
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_schema = 'public' and table_name = 'todos'
+order by ordinal_position;
+
+-- Verifikasi 3: jumlah kebijakan RLS - todos harus 4, notifications 3,
+-- push_subscriptions 4.
+select tablename, policyname, cmd
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('todos', 'notifications', 'push_subscriptions')
+order by tablename, policyname;
+
+-- Verifikasi 4: harus mengembalikan 200 / daftar kosong, bukan error 42703.
+-- select id, judul, target_divisi from public.schedules limit 1;
+-- select id, penerima_id, dibaca from public.notifications limit 1;
+-- select id, user_id from public.push_subscriptions limit 1;

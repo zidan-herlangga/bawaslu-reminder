@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import { getSlots, sortSlots } from '../lib/slots';
@@ -333,6 +334,13 @@ export default function Kalender() {
                         >
                           {item.kategori}
                         </span>
+                        <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
+                          {item.target_divisi
+                            ? `Khusus ${
+                                DIVISI_SHORT[item.target_divisi] ?? item.target_divisi
+                              }`
+                            : 'Semua staf'}
+                        </span>
                         {totalSlots > 1 && (
                           <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
                             {totalSlots} sesi
@@ -355,10 +363,20 @@ export default function Kalender() {
                         </p>
                       )}
 
-                      <p className="mt-2 border-t border-bw-line pt-1.5 text-[10px] text-bw-muted">
-                        {item.pembuat_nama} -{' '}
-                        {DIVISI_SHORT[item.pembuat_divisi] ?? item.pembuat_divisi}
-                      </p>
+                      <div className="mt-2 flex items-center justify-between gap-2 border-t border-bw-line pt-1.5">
+                        <p className="min-w-0 truncate text-[10px] text-bw-muted">
+                          {item.pembuat_nama} -{' '}
+                          {DIVISI_SHORT[item.pembuat_divisi] ?? item.pembuat_divisi}
+                        </p>
+                        {item.pembuat_id === session.user.id && (
+                          <Link
+                            to={`/jadwal/${item.id}/edit`}
+                            className="shrink-0 text-[10px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          >
+                            Edit
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>

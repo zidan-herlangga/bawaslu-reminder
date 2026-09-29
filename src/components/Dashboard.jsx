@@ -5,6 +5,8 @@ import fetchProfile from '../lib/fetchProfile';
 import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
 import ClockWidget from './ClockWidget';
+import AddToCalendar from './AddToCalendar';
+import { sendRemind } from '../lib/push';
 import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
 
@@ -59,8 +61,26 @@ export default function Dashboard() {
   const [listError, setListError] = useState('');
   const [divisiFilter, setDivisiFilter] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const [remind, setRemind] = useState({ id: '', status: '', message: '' });
 
-  const reminder = useDueReminder(schedules);
+  const reminder = useDueReminder(schedules, profile?.divisi);
+
+  const handleRemind = async (schedule) => {
+    setRemind({ id: schedule.id, status: 'busy', message: '' });
+
+    try {
+      const result = await sendRemind(schedule.id, session);
+      const catatan = result.catatan ? ` ${result.catatan}` : '';
+      setRemind({
+        id: schedule.id,
+        status: 'ok',
+        message: `Pengingat terkirim ke ${result.terkirim} penerima, ${result.push} notifikasi browser.${catatan}`,
+      });
+    } catch (error) {
+      console.error('[Dashboard] kirim pengingat gagal:', error?.message);
+      setRemind({ id: schedule.id, status: 'error', message: error?.message ?? 'Gagal mengirim.' });
+    }
+  };
 
   const loadSchedules = useCallback(async () => {
     const { data, error } = await supabase
@@ -266,6 +286,13 @@ export default function Dashboard() {
                       >
                         {schedule.kategori}
                       </span>
+                      <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
+                        {schedule.target_divisi
+                          ? `Khusus ${
+                              DIVISI_SHORT[schedule.target_divisi] ?? schedule.target_divisi
+                            }`
+                          : 'Semua staf'}
+                      </span>
                       {schedule.status !== 'Aktif' && (
                         <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-red ring-1 ring-bw-red-100">
                           {schedule.status}
@@ -307,6 +334,21 @@ export default function Dashboard() {
                       {schedule.pembuat_nama} -{' '}
                       {DIVISI_SHORT[schedule.pembuat_divisi] ?? schedule.pembuat_divisi}
                     </p>
+
+                    {remind.id === schedule.id && remind.message && (
+                      <p
+                        role="status"
+                        className={`mt-2 rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed ${
+                          remind.status === 'error'
+                            ? 'bg-bw-red-50 text-bw-red'
+                            : 'bg-bw-blue-50 text-bw-blue-900'
+                        }`}
+                      >
+                        {remind.message}
+                      </p>
+                    )}
+
+                    <AddToCalendar schedule={schedule} />
                   </div>
 
                   <div className="shrink-0 text-right">
@@ -318,17 +360,35 @@ export default function Dashboard() {
                       {schedule.status === 'Aktif' ? sisa : schedule.status}
                     </p>
                     {schedule.pembuat_id === session.user.id && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!window.confirm('Hapus jadwal ini?')) return;
-                          await supabase.from('schedules').delete().eq('id', schedule.id);
-                          loadSchedules();
-                        }}
-                        className="mt-2 text-[11px] font-semibold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
-                      >
-                        Hapus
-                      </button>
+                      <div className="mt-2 flex flex-col items-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRemind(schedule)}
+                          disabled={remind.id === schedule.id && remind.status === 'busy'}
+                          className="text-[11px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:text-bw-muted disabled:no-underline"
+                        >
+                          {remind.id === schedule.id && remind.status === 'busy'
+                            ? 'Mengirim...'
+                            : 'Ingatkan'}
+                        </button>
+                        <Link
+                          to={`/jadwal/${schedule.id}/edit`}
+                          className="text-[11px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!window.confirm('Hapus jadwal ini?')) return;
+                            await supabase.from('schedules').delete().eq('id', schedule.id);
+                            loadSchedules();
+                          }}
+                          className="text-[11px] font-semibold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

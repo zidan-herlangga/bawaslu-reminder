@@ -224,6 +224,75 @@ export default function Register() {
             </p>
           </div>
 
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-800">
+              <svg
+                className="h-3.5 w-3.5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                />
+              </svg>
+              Perhatian sebelum mengisi
+            </p>
+            <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-amber-900">
+              <li className="flex gap-1.5">
+                <span aria-hidden="true" className="font-bold">
+                  1.
+                </span>
+                <span>
+                  <strong>Email</strong> harus email aktif milik Anda sendiri. Setelah
+                  terdaftar, email <strong>tidak bisa diubah</strong>, dan dipakai untuk
+                  masuk serta tautan &quot;Lupa sandi&quot;.
+                </span>
+              </li>
+              <li className="flex gap-1.5">
+                <span aria-hidden="true" className="font-bold">
+                  2.
+                </span>
+                <span>
+                  <strong>Nama lengkap</strong> ditulis sesuai nama sehari-hari, karena
+                  nama ini tampil di setiap jadwal yang Anda buat.
+                </span>
+              </li>
+              <li className="flex gap-1.5">
+                <span aria-hidden="true" className="font-bold">
+                  3.
+                </span>
+                <span>
+                  <strong>Divisi &amp; Jabatan</strong> dipilih sesuai data sebenarnya.
+                  Masih bisa diperbaiki nanti di halaman <strong>Akun</strong>.
+                </span>
+              </li>
+              <li className="flex gap-1.5">
+                <span aria-hidden="true" className="font-bold">
+                  4.
+                </span>
+                <span>
+                  <strong>Kata sandi</strong> minimal {MIN_PASSWORD_LENGTH} karakter dan
+                  wajib Anda simpan sendiri; satu-satunya cara menggantinya lewat
+                  &quot;Lupa sandi&quot;.
+                </span>
+              </li>
+              <li className="flex gap-1.5">
+                <span aria-hidden="true" className="font-bold">
+                  5.
+                </span>
+                <span>
+                  Satu orang cukup <strong>satu akun</strong>. Email yang sudah terdaftar
+                  akan ditolak.
+                </span>
+              </li>
+            </ul>
+          </div>
+
           <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
             {formError && (
               <div

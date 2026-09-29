@@ -9,7 +9,7 @@ function isSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
-export default function useDueReminder(schedules) {
+export default function useDueReminder(schedules, divisi) {
   const [permission, setPermission] = useState(() =>
     isSupported() ? Notification.permission : 'unsupported'
   );
@@ -29,6 +29,7 @@ export default function useDueReminder(schedules) {
 
       schedules.forEach((schedule) => {
         if (schedule.status !== 'Aktif') return;
+        if (schedule.target_divisi && schedule.target_divisi !== divisi) return;
 
         sortSlots(getSlots(schedule)).forEach((slot) => {
           const noticeKey = `${schedule.id}::${slot.mulai}`;
@@ -58,7 +59,7 @@ export default function useDueReminder(schedules) {
     const timer = setInterval(check, CHECK_INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [schedules]);
+  }, [schedules, divisi]);
 
   return useMemo(
     () => ({

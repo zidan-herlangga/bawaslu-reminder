@@ -1,0 +1,194 @@
+import { createClient } from '@supabase/supabase-js';
+import webpush from 'web-push';
+
+const REQUIRED_ENV = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY',
+];
+
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+function jamWIB(iso) {
+  const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+  const pad = (value) => String(value).padStart(2, '0');
+  return (
+    `${HARI[wib.getUTCDay()]}, ${wib.getUTCDate()} ${BULAN[wib.getUTCMonth()]} ` +
+    `${wib.getUTCFullYear()}, ${pad(wib.getUTCHours())}.${pad(wib.getUTCMinutes())} WIB`
+  );
+}
+
+function reply(res, status, body) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req) {
+  if (!req.body) return {};
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return {};
+    }
+  }
+  return req.body;
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Allow', 'POST');
+
+  if (req.method !== 'POST') {
+    return reply(res, 405, { error: 'Metode tidak diizinkan.' });
+  }
+
+  const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    return reply(res, 500, {
+      error:
+        'Variabel environment Vercel belum diisi: ' +
+        missing.join(', ') +
+        '. Buka Vercel > Project > Settings > Environment Variables.',
+    });
+  }
+
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token) return reply(res, 401, { error: 'Token sesi tidak ditemukan.' });
+
+  const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: userData, error: userError } = await admin.auth.getUser(token);
+  if (userError || !userData?.user) {
+    return reply(res, 401, { error: 'Sesi tidak valid. Silakan keluar dan masuk kembali.' });
+  }
+
+  const sender = userData.user;
+  const scheduleId = readBody(req).scheduleId;
+  if (!scheduleId) return reply(res, 400, { error: 'scheduleId wajib diisi.' });
+
+  const { data: schedule, error: scheduleError } = await admin
+    .from('schedules')
+    .select('id, judul, waktu_mulai, target_divisi, pembuat_id')
+    .eq('id', scheduleId)
+    .maybeSingle();
+
+  if (scheduleError) return reply(res, 500, { error: scheduleError.message });
+  if (!schedule) return reply(res, 404, { error: 'Jadwal tidak ditemukan.' });
+  if (schedule.pembuat_id !== sender.id) {
+    return reply(res, 403, { error: 'Hanya pembuat jadwal yang boleh mengirim pengingat.' });
+  }
+
+  let profileQuery = admin.from('profiles').select('id, divisi');
+  if (schedule.target_divisi) profileQuery = profileQuery.eq('divisi', schedule.target_divisi);
+
+  const { data: profiles, error: profileError } = await profileQuery;
+  if (profileError) return reply(res, 500, { error: profileError.message });
+
+  const recipients = (profiles ?? []).filter((item) => item.id !== sender.id);
+  const targetLabel = schedule.target_divisi ?? 'semua staf';
+  const pesan =
+    `${schedule.judul} - ${jamWIB(schedule.waktu_mulai)}. ` +
+    `Ditujukan untuk ${targetLabel}.`;
+
+  if (recipients.length === 0) {
+    return reply(res, 200, { terkirim: 0, push: 0, pesan, catatan: 'Tidak ada penerima.' });
+  }
+
+  const rows = recipients.map((item) => ({
+    jadwal_id: schedule.id,
+    pengirim_id: sender.id,
+    penerima_id: item.id,
+    judul: 'Pengingat jadwal',
+    pesan,
+    target_divisi: schedule.target_divisi,
+  }));
+
+  const { error: insertError } = await admin.from('notifications').insert(rows);
+  if (insertError) return reply(res, 500, { error: insertError.message });
+
+  const recipientIds = recipients.map((item) => item.id);
+  const { data: subscriptions, error: subError } = await admin
+    .from('push_subscriptions')
+    .select('user_id, endpoint, p256dh, auth')
+    .in('user_id', recipientIds);
+
+  if (subError) {
+    return reply(res, 200, {
+      terkirim: recipients.length,
+      push: 0,
+      pesan,
+      catatan: `Notifikasi tersimpan, tetapi langganan push gagal dibaca: ${subError.message}`,
+    });
+  }
+
+  if (!subscriptions || subscriptions.length === 0) {
+    return reply(res, 200, {
+      terkirim: recipients.length,
+      push: 0,
+      pesan,
+      catatan: 'Belum ada penerima yang mengaktifkan notifikasi browser.',
+    });
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@bawaslu.go.id',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+
+  const payload = JSON.stringify({
+    title: 'Pengingat jadwal',
+    body: pesan,
+    url: '/',
+  });
+
+  const expired = [];
+  const results = await Promise.allSettled(
+    subscriptions.map((item) =>
+      webpush
+        .sendNotification(
+          { endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth } },
+          payload
+        )
+        .catch((error) => {
+          const status = error?.statusCode;
+          if (status === 404 || status === 410) expired.push(item.endpoint);
+          throw error;
+        })
+    )
+  );
+
+  if (expired.length > 0) {
+    await admin.from('push_subscriptions').delete().in('endpoint', expired);
+  }
+
+  const pushCount = results.filter((item) => item.status === 'fulfilled').length;
+
+  return reply(res, 200, {
+    terkirim: recipients.length,
+    push: pushCount,
+    pesan,
+    catatan:
+      pushCount < subscriptions.length
+        ? `${subscriptions.length - pushCount} perangkat tidak bisa dijangkau dan sudah dibersihkan.`
+        : '',
+  });
+}
