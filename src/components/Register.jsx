@@ -213,7 +213,7 @@ export default function Register() {
   return (
     <div className="flex min-h-full items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
           <div className="border-b border-bw-line pb-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Pendaftaran
@@ -224,7 +224,7 @@ export default function Register() {
             </p>
           </div>
 
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3">
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-amber-800">
               <svg
                 className="h-3.5 w-3.5 shrink-0"

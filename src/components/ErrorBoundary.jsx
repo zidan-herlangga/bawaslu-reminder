@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component {
     if (!this.state.error) return this.props.children;
 
     return (
-      <div className="rounded-xl border border-bw-red-100 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-bw-red-100 bg-white p-5 shadow-card">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
           Terjadi kesalahan
         </p>

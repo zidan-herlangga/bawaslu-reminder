@@ -26,6 +26,10 @@
   --color-bw-line: #e1e1e1;
   --color-bw-surface: #f7f7f7;
   --color-bw-canvas: #f2f2f2;
+
+  /* Bayangan berlapis supaya kartu terangkat halus, bukan bayangan pipih template. */
+  --shadow-card: 0 1px 2px rgba(30, 30, 30, 0.04), 0 18px 36px -28px rgba(30, 30, 30, 0.45);
+  --shadow-lift: 0 2px 6px rgba(30, 30, 30, 0.05), 0 28px 56px -30px rgba(30, 30, 30, 0.5);
 }
 
 @layer base {

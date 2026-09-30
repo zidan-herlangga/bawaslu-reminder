@@ -15,7 +15,7 @@ export default function AddToCalendar({ schedule }) {
   if (!href) return null;
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5">
       <a
         href={href}
         target="_blank"

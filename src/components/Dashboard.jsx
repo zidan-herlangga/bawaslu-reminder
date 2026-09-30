@@ -21,6 +21,13 @@ const KATEGORI_STYLE = {
   Lainnya: 'bg-bw-surface text-bw-muted ring-bw-line',
 };
 
+const KATEGORI_ACCENT = {
+  Rapat: 'bg-bw-blue',
+  Tugas: 'bg-amber-500',
+  Pengawasan: 'bg-emerald-500',
+  Lainnya: 'bg-bw-line',
+};
+
 function formatWaktu(iso) {
   return new Date(iso).toLocaleString('id-ID', {
     weekday: 'long',
@@ -52,6 +59,16 @@ function formatJam(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatTanggalPendek(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('id-ID', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 function splitCountdown(targetMs, now) {
@@ -194,7 +211,9 @@ export default function Dashboard() {
       <ClockWidget />
 
       {nextItem && (
-        <section className="rounded-xl border border-bw-blue-200 bg-white p-5 shadow-sm ring-1 ring-bw-blue-100/70">
+        <section className="relative overflow-hidden rounded-2xl border border-bw-blue-200 bg-gradient-to-br from-white via-white to-bw-blue-50 p-5 shadow-card ring-1 ring-bw-blue-100/70 sm:p-6">
+          <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-bw-blue" />
+
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-bw-blue">
@@ -203,11 +222,17 @@ export default function Dashboard() {
               <h2 className="mt-1.5 font-display text-lg font-bold leading-snug text-bw-ink">
                 {nextItem.schedule.judul}
               </h2>
-              <p className="mt-1 text-xs leading-relaxed text-bw-muted">
-                {formatWaktu(nextItem.slot.mulai)}
-                {nextItem.slot.selesai && ` sampai ${formatJam(nextItem.slot.selesai)}`}
+              <p className="mt-2 font-display text-[15px] font-bold leading-none tabular-nums text-bw-ink">
+                {formatJam(nextItem.slot.mulai)}
+                {nextItem.slot.selesai && (
+                  <span className="text-bw-muted"> - {formatJam(nextItem.slot.selesai)}</span>
+                )}
               </p>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <p className="mt-1.5 text-xs leading-relaxed text-bw-muted">
+                {formatTanggalPendek(nextItem.slot.mulai)}
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ring-1 ${
                     KATEGORI_STYLE[nextItem.schedule.kategori] ?? KATEGORI_STYLE['Lainnya']
@@ -215,7 +240,7 @@ export default function Dashboard() {
                 >
                   {nextItem.schedule.kategori}
                 </span>
-                <span className="rounded-full bg-bw-surface px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
                   {nextItem.schedule.target_divisi
                     ? `Khusus ${
                         DIVISI_SHORT[nextItem.schedule.target_divisi] ??
@@ -238,7 +263,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-bw-muted">
           {sapaan}
         </p>
@@ -267,7 +292,7 @@ export default function Dashboard() {
       </section>
 
       {reminder.supported && reminder.permission !== 'granted' && (
-        <div className="flex items-start gap-3 rounded-xl border border-bw-blue-200 bg-bw-blue-50 px-4 py-3">
+        <div className="flex items-start gap-3 rounded-2xl border border-bw-blue-200 bg-bw-blue-50 px-4 py-3">
           <p className="flex-1 text-xs leading-relaxed text-bw-blue-900">
             Aktifkan notifikasi agar pengingat muncul {reminder.leadMinutes} menit
             sebelum jadwal dimulai.
@@ -320,7 +345,7 @@ export default function Dashboard() {
       {listError && (
         <div
           role="alert"
-          className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+          className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
         >
           {listError}
         </div>
@@ -334,7 +359,21 @@ export default function Dashboard() {
         )}
 
         {!listLoading && schedules.length === 0 && !listError && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+            <svg
+              className="mx-auto mb-3 h-9 w-9 text-bw-blue-200"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="5" width="18" height="16" rx="3" />
+              <path d="M8 3v4M16 3v4M3 10h18" />
+              <path d="M12 13.5v5M9.5 16h5" />
+            </svg>
             <p className="text-sm font-semibold text-bw-ink">Belum ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Tekan tombol Buat untuk menambahkan pengingat pertama.
@@ -343,7 +382,19 @@ export default function Dashboard() {
         )}
 
         {!listLoading && schedules.length > 0 && visibleSchedules.length === 0 && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+            <svg
+              className="mx-auto mb-3 h-9 w-9 text-bw-blue-200"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M7 12h10M10 18h4" />
+            </svg>
             <p className="text-sm font-semibold text-bw-ink">Tidak ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Belum ada jadwal dari divisi yang dipilih.
@@ -374,11 +425,18 @@ export default function Dashboard() {
             return (
               <article
                 key={schedule.id}
-                className={`rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow ${
-                  sudahLewat ? 'border-bw-line opacity-70' : 'border-bw-line'
+                className={`group relative overflow-hidden rounded-2xl border border-bw-line bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift ${
+                  sudahLewat ? 'opacity-70' : ''
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-y-0 left-0 w-1 ${
+                    KATEGORI_ACCENT[schedule.kategori] ?? KATEGORI_ACCENT['Lainnya']
+                  }`}
+                />
+
+                <div className="flex items-start gap-3 p-4 pl-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
@@ -409,31 +467,32 @@ export default function Dashboard() {
                       {schedule.judul}
                     </h3>
 
-                    <ul className="mt-1.5 space-y-1">
-                      {slots.map((slot) => (
-                        <li
-                          key={slot.mulai}
-                          className="flex items-start gap-2 text-xs leading-relaxed text-bw-muted"
-                        >
-                          <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-bw-blue" />
-                          <span>
-                            {formatWaktu(slot.mulai)}
-                            {slot.selesai && ` sampai ${formatJam(slot.selesai)}`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    {slots.length > 0 && (
+                      <ul className="mt-2.5 divide-y divide-bw-line/70 rounded-xl bg-bw-surface px-3 py-0.5">
+                        {slots.map((slot) => (
+                          <li
+                            key={slot.mulai}
+                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2"
+                          >
+                            <span className="font-display text-[15px] font-bold leading-none tabular-nums text-bw-ink">
+                              {formatJam(slot.mulai)}
+                              {slot.selesai && (
+                                <span className="text-bw-muted"> - {formatJam(slot.selesai)}</span>
+                              )}
+                            </span>
+                            <span className="ml-auto text-xs text-bw-muted">
+                              {formatTanggalPendek(slot.mulai)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
                     {schedule.deskripsi && (
                       <p className="mt-2 whitespace-pre-line break-words text-xs leading-relaxed text-bw-muted">
                         {schedule.deskripsi}
                       </p>
                     )}
-
-                    <p className="mt-3 border-t border-bw-line pt-2 text-xs text-bw-muted">
-                      {schedule.pembuat_nama} -{' '}
-                      {DIVISI_SHORT[schedule.pembuat_divisi] ?? schedule.pembuat_divisi}
-                    </p>
 
                     {remind.id === schedule.id && remind.message && (
                       <p
@@ -447,8 +506,6 @@ export default function Dashboard() {
                         {remind.message}
                       </p>
                     )}
-
-                    <AddToCalendar schedule={schedule} />
                   </div>
 
                   <div className="shrink-0 text-right">
@@ -513,6 +570,14 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+
+                <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-bw-line bg-bw-surface/70 px-4 py-2.5 pl-5">
+                  <p className="min-w-0 truncate text-xs text-bw-muted">
+                    {schedule.pembuat_nama} -{' '}
+                    {DIVISI_SHORT[schedule.pembuat_divisi] ?? schedule.pembuat_divisi}
+                  </p>
+                  <AddToCalendar schedule={schedule} />
+                </footer>
               </article>
             );
           })}

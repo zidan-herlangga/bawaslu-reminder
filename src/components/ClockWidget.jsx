@@ -20,7 +20,7 @@ export default function ClockWidget() {
   });
 
   return (
-    <section className="rounded-xl border border-bw-blue-200 bg-gradient-to-br from-bw-blue to-bw-blue-hi p-4 text-white shadow-sm">
+    <section className="rounded-2xl border border-bw-blue-200 bg-gradient-to-br from-bw-blue to-bw-blue-hi p-4 text-white shadow-card">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/75">
           Waktu Sekarang

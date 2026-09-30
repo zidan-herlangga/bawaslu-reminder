@@ -207,7 +207,7 @@ export default function Akun() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl border border-bw-line bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-bw-line bg-white shadow-card">
         <div className="flex items-center gap-3.5 border-b border-bw-line bg-bw-blue-50 px-4 py-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-bw-blue text-lg font-bold text-white ring-4 ring-white">
             {initialsOf(nama)}
@@ -330,7 +330,7 @@ export default function Akun() {
         )}
       </section>
 
-      <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
         <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Pengaturan Pengingat
         </h2>
@@ -384,7 +384,7 @@ export default function Akun() {
         )}
       </section>
 
-      <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
         <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Keamanan Akun
         </h2>
@@ -449,7 +449,7 @@ export default function Akun() {
       <button
         type="button"
         onClick={signOut}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-bw-red-100 bg-white px-4 py-3 text-sm font-semibold text-bw-red transition-colors hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-bw-red-100 bg-white px-4 py-3 text-sm font-semibold text-bw-red transition-colors hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
       >
         Keluar dari akun
       </button>

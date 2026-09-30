@@ -230,7 +230,7 @@ export default function TodoPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
         <div className="flex items-start justify-between gap-3 border-b border-bw-line pb-3">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
@@ -321,7 +321,7 @@ export default function TodoPage() {
         )}
 
         {!listLoading && visible.length === 0 && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
+          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
             <p className="text-sm font-semibold text-bw-ink">Belum ada todo</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               {tab === 'tanggal'
@@ -339,7 +339,7 @@ export default function TodoPage() {
               return (
                 <li
                   key={todo.id}
-                  className="flex items-start gap-3 rounded-xl border border-bw-line bg-white p-3.5 shadow-sm"
+                  className="flex items-start gap-3 rounded-2xl border border-bw-line bg-white p-3.5 shadow-card"
                 >
                   <input
                     id={`todo-${todo.id}`}

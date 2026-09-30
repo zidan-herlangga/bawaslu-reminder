@@ -345,7 +345,7 @@ export default function ScheduleForm() {
       <div className="mx-auto w-full max-w-sm space-y-3">
         <div
           role="alert"
-          className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+          className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
         >
           {detailError}
         </div>
@@ -361,7 +361,7 @@ export default function ScheduleForm() {
 
   return (
     <div className="mx-auto w-full max-w-sm sm:max-w-md lg:max-w-xl">
-      <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
         <div className="border-b border-bw-line pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
             {isEdit ? 'Ubah Jadwal' : 'Jadwal Baru'}
@@ -496,7 +496,7 @@ export default function ScheduleForm() {
               {form.slots.map((slot, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-bw-line bg-bw-surface p-3"
+                  className="rounded-2xl border border-bw-line bg-bw-surface p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wide text-bw-muted">

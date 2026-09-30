@@ -400,12 +400,6 @@ export default function AppShell() {
               width={132}
               height={44}
             />
-            <div className="min-w-0 leading-tight">
-              <p className="truncate font-display text-[15px] font-bold text-bw-ink">
-                Pengingat Jadwal
-              </p>
-              <p className="truncate text-xs text-bw-muted">Bawaslu Kota Bekasi</p>
-            </div>
           </div>
           {session && (
             <div className="flex shrink-0 items-center gap-1.5">
@@ -464,7 +458,7 @@ export default function AppShell() {
             <div
               role="dialog"
               aria-label="Notifikasi"
-              className="absolute right-3 top-full z-20 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-bw-line bg-white shadow-xl"
+              className="absolute right-3 top-full z-20 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-bw-line bg-white shadow-xl"
             >
               <div className="flex items-center justify-between gap-2 border-b border-bw-line bg-bw-surface px-3 py-2">
                 <p className="text-[12px] font-bold uppercase tracking-wide text-bw-muted">
@@ -628,7 +622,7 @@ export default function AppShell() {
             className="pointer-events-none absolute inset-x-3 bottom-20 z-40 flex justify-center"
           >
             <p
-              className={`max-w-full rounded-xl px-3.5 py-2.5 text-center text-xs font-semibold leading-snug shadow-lg ring-1 ${
+              className={`max-w-full rounded-2xl px-3.5 py-2.5 text-center text-xs font-semibold leading-snug shadow-lg ring-1 ${
                 TOAST_TONE[toast.tone] || TOAST_TONE.info
               }`}
             >

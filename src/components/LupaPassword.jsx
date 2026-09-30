@@ -64,7 +64,7 @@ export default function LupaPassword() {
   return (
     <div className="flex min-h-full items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
           <div className="border-b border-bw-line pb-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Lupa Kata Sandi

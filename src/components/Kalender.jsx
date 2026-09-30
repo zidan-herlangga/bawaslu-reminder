@@ -183,7 +183,7 @@ export default function Kalender() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
         <div className="flex items-center justify-between gap-2">
           <ChevronButton direction="left" onClick={() => goMonth(-1)} label="Bulan sebelumnya" />
 
@@ -282,7 +282,7 @@ export default function Kalender() {
         {listError && (
           <div
             role="alert"
-            className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+            className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
           >
             {listError}
           </div>
@@ -293,7 +293,7 @@ export default function Kalender() {
         )}
 
         {!listLoading && !listError && selectedItems.length === 0 && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
+          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
             <p className="text-sm font-semibold text-bw-ink">Tidak ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Belum ada jadwal pada tanggal ini.
@@ -311,7 +311,7 @@ export default function Kalender() {
               return (
                 <li
                   key={`${item.id}-${slot.mulai}`}
-                  className={`rounded-xl border border-bw-line bg-white p-3.5 shadow-sm ${
+                  className={`rounded-2xl border border-bw-line bg-white p-3.5 shadow-card ${
                     sudahLewat ? 'opacity-70' : ''
                   }`}
                 >
