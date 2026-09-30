@@ -18,6 +18,7 @@ const wavBuffers = new Map();
 const loadPromises = new Map();
 
 let lockCount = 0;
+let pendingKategori;
 const busyListeners = new Set();
 
 export function subscribeSound(listener) {
@@ -30,6 +31,14 @@ export function subscribeSound(listener) {
 function emitBusy() {
   const busy = lockCount > 0;
   busyListeners.forEach((listener) => listener(busy));
+
+  // Nada yang datang saat masih berbunyi tidak dibuang: dimainkan begitu
+  // nada selesai, supaya tidak ada pengingat yang kehilangan suara.
+  if (!busy && pendingKategori !== undefined) {
+    const kategori = pendingKategori;
+    pendingKategori = undefined;
+    if (isSoundEnabled()) void playChime(kategori);
+  }
 }
 
 export function isSoundBusy() {
@@ -96,6 +105,16 @@ function resolveSoundUrl(kategori) {
   return SOUND_BY_KATEGORI[key] || DEFAULT_SOUND_URL;
 }
 
+// fetch tanpa timeout bisa menggantung selamanya di jaringan buruk, dan itu
+// berarti kunci nada ikut terkunci terus -> suara mati total sampai reload.
+function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { cache: 'force-cache', signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
 function ensureSoundLoaded(url) {
   if (loadPromises.has(url)) return loadPromises.get(url);
 
@@ -104,7 +123,7 @@ function ensureSoundLoaded(url) {
     if (!context) return null;
 
     try {
-      const response = await fetch(url, { cache: 'force-cache' });
+      const response = await fetchWithTimeout(url, 5000);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const bytes = await response.arrayBuffer();
@@ -169,7 +188,7 @@ function startWav(context, buffer, release) {
     release();
   };
 
-  const limitMs = Math.min(15000, Math.max(2000, buffer.duration * 1000 + 1500));
+  const limitMs = Math.min(30000, Math.max(2000, buffer.duration * 1000 + 1500));
   watchdog = setTimeout(finish, limitMs);
 
   playSource(context, buffer, 1, finish);
@@ -233,27 +252,44 @@ export function setSoundEnabled(enabled) {
 
 export async function playChime(kategori) {
   // Satu nada pada satu waktu: klik berulang selama nada masih berbunyi diabaikan.
-  if (lockCount > 0) return false;
+  if (lockCount > 0) {
+    console.warn('[sound] dilewatkan: nada sebelumnya belum selesai');
+    return false;
+  }
 
   // Belum ada gesture sama sekali -> jangan buat AudioContext, jangan kunci tombol.
-  if (!hasActivation()) return false;
+  if (!hasActivation()) {
+    console.warn('[sound] dilewatkan: belum ada gesture pengguna');
+    return false;
+  }
 
   const release = acquire();
   let handedOff = false;
 
+  // Jaringan buruk bisa membuat async di bawah ini tidak pernah selesai;
+  // watchdog memaksa kunci dilepas supaya tombol tidak macet selamanya.
+  // Dihapus saat nada benar-benar mulai (handedOff), jadi tidak memotong durasi.
+  const hardStop = setTimeout(release, 12000);
+
   try {
     const context = getAudioContext();
-    if (!context) return false;
+    if (!context) {
+      console.warn('[sound] dilewatkan: AudioContext tidak tersedia');
+      return false;
+    }
 
     const buffer = await ensureSoundLoaded(resolveSoundUrl(kategori));
 
     if (context.state !== 'running') {
       await Promise.race([
         context.resume().catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, 400)),
+        new Promise((resolve) => setTimeout(resolve, 800)),
       ]);
     }
-    if (context.state !== 'running') return false;
+    if (context.state !== 'running') {
+      console.warn(`[sound] dilewatkan: AudioContext tetap ${context.state}`);
+      return false;
+    }
 
     if (buffer) {
       startWav(context, buffer, release);
@@ -266,10 +302,18 @@ export async function playChime(kategori) {
     return true;
   } finally {
     if (!handedOff) release();
+    clearTimeout(hardStop);
   }
 }
 
 export async function playReminderSound(kategori) {
   if (!isSoundEnabled()) return false;
+
+  // Sedang berbunyi -> jangan dibuang, tunggu giliran lewat emitBusy().
+  if (lockCount > 0) {
+    pendingKategori = kategori;
+    return false;
+  }
+
   return playChime(kategori);
 }
