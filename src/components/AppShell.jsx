@@ -374,13 +374,13 @@ export default function AppShell() {
     { to: '/', label: 'Beranda', icon: IconHome, end: true },
     { to: '/kalender', label: 'Kalender', icon: IconCalendar, end: false },
     { to: '/todo', label: 'Todo', icon: IconChecklist, end: false },
-    { to: '/jadwal/baru', label: 'Buat Jadwal', icon: IconPlus, end: false },
+    { to: '/jadwal/baru', label: 'Buat Jadwal', short: 'Buat', icon: IconPlus, end: false },
     { to: '/akun', label: 'Akun', icon: IconUser, end: false },
   ];
 
   return (
     <div className="flex min-h-dvh justify-center bg-bw-canvas">
-      <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-[0_0_50px_rgba(0,0,0,0.18)] ring-1 ring-black/5 lg:max-w-[860px]">
+      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white shadow-[0_0_50px_rgba(0,0,0,0.18)] ring-1 ring-black/5 sm:max-w-[560px] md:max-w-[760px] lg:max-w-[860px]">
         <div className="bw-marquee shrink-0 overflow-hidden bg-bw-ink py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/55">
           <span className="sr-only">
             Bawaslu Kota Bekasi - Sistem Pengingat Jadwal
@@ -391,17 +391,17 @@ export default function AppShell() {
           </div>
         </div>
 
-        <header className="relative z-10 flex shrink-0 justify-between items-center gap-3 border-b border-bw-line bg-white px-4 py-3 lg:px-6">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <header className="relative z-10 flex shrink-0 justify-between items-center gap-3 border-b border-bw-line bg-white px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <img
               src="/logo-bawaslu.png"
               alt="Logo Bawaslu"
-              className="h-10 w-auto shrink-0 object-contain"
+              className="h-9 w-auto shrink-0 object-contain sm:h-10"
               width={132}
               height={44}
             />
             <div className="min-w-0 leading-tight">
-              <p className="font-display text-[15px] font-bold text-bw-ink">
+              <p className="truncate font-display text-[15px] font-bold text-bw-ink">
                 Pengingat Jadwal
               </p>
               <p className="truncate text-xs text-bw-muted">Bawaslu Kota Bekasi</p>
@@ -575,7 +575,7 @@ export default function AppShell() {
         </header>
 
         <main
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 lg:px-6 ${
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 sm:px-6 ${
             showNav ? 'py-4' : 'py-6'
           }`}
         >
@@ -587,7 +587,7 @@ export default function AppShell() {
         {showNav && (
           <nav className="safe-bottom shrink-0 border-t border-bw-line bg-white pt-1">
             <ul className="mx-auto grid max-w-[560px] grid-cols-5">
-              {navItems.map(({ to, label, icon: Icon, end }) => (
+              {navItems.map(({ to, label, short, icon: Icon, end }) => (
                 <li key={to}>
                   <NavLink
                     to={to}
@@ -604,7 +604,14 @@ export default function AppShell() {
                           <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-bw-blue" />
                         )}
                         <Icon className="h-[22px] w-[22px]" />
-                        <span>{label}</span>
+                        {short ? (
+                          <>
+                            <span className="md:hidden">{short}</span>
+                            <span className="hidden md:inline">{label}</span>
+                          </>
+                        ) : (
+                          <span>{label}</span>
+                        )}
                       </>
                     )}
                   </NavLink>

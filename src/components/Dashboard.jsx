@@ -227,7 +227,7 @@ export default function Dashboard() {
             </div>
 
             <div className="shrink-0 text-right">
-              <p className="font-display text-[40px] font-bold leading-none tabular-nums text-bw-blue">
+              <p className="font-display text-[36px] font-bold leading-none tabular-nums text-bw-blue sm:text-[44px] md:text-[48px]">
                 {splitCountdown(nextItem.nextStart, now).angka}
               </p>
               <p className="mt-1 font-display text-xs font-semibold uppercase tracking-wide text-bw-muted">
@@ -293,7 +293,7 @@ export default function Dashboard() {
           </span>
         </div>
 
-        <div className="-mx-4 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
           <div className="flex w-max gap-2">
             {DIVISI_FILTER_OPTIONS.map((option) => {
               const active = divisiFilter === option.value;
@@ -326,15 +326,15 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {listLoading && (
-          <p className="py-8 text-center text-sm text-bw-muted lg:col-span-2">
+          <p className="py-8 text-center text-sm text-bw-muted md:col-span-2">
             Memuat jadwal...
           </p>
         )}
 
         {!listLoading && schedules.length === 0 && !listError && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center lg:col-span-2">
+          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
             <p className="text-sm font-semibold text-bw-ink">Belum ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Tekan tombol Buat untuk menambahkan pengingat pertama.
@@ -343,7 +343,7 @@ export default function Dashboard() {
         )}
 
         {!listLoading && schedules.length > 0 && visibleSchedules.length === 0 && (
-          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center lg:col-span-2">
+          <div className="rounded-xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
             <p className="text-sm font-semibold text-bw-ink">Tidak ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Belum ada jadwal dari divisi yang dipilih.
@@ -453,7 +453,7 @@ export default function Dashboard() {
 
                   <div className="shrink-0 text-right">
                     <p
-                      className={`text-xs font-bold ${
+                      className={`max-w-[6.5rem] text-xs font-bold ${
                         sudahLewat ? 'text-bw-muted' : 'text-bw-blue'
                       }`}
                     >

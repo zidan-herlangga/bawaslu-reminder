@@ -360,7 +360,7 @@ export default function ScheduleForm() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-sm">
+    <div className="mx-auto w-full max-w-sm sm:max-w-md lg:max-w-xl">
       <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
         <div className="border-b border-bw-line pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
