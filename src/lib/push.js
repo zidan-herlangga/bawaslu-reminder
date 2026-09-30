@@ -160,7 +160,12 @@ export async function notifyNow({ title, body, tag, url = '/' }) {
   };
 
   try {
-    const registration = await navigator.serviceWorker?.getRegistration?.();
+    // Chrome mobile dan PWA menolak new Notification() dari halaman, jadi
+    // utamakan ServiceWorkerRegistration.showNotification(). Kalau service
+    // worker belum pernah terpasang (push belum diaktifkan), pasang dulu.
+    const existing = await navigator.serviceWorker?.getRegistration?.();
+    const registration =
+      existing || (await navigator.serviceWorker?.register?.('/sw.js', { scope: '/' }));
     if (registration?.showNotification) {
       await registration.showNotification(title, options);
       return { ok: true, reason: 'sw' };

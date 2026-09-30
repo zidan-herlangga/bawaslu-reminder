@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NOTIFICATION_LEAD_MINUTES } from '../constants/options';
 import { playReminderSound } from '../lib/sound';
+import { notifyNow } from '../lib/push';
 import { getSlots, sortSlots } from '../lib/slots';
 
 const CHECK_INTERVAL_MS = 30 * 1000;
@@ -49,7 +50,11 @@ export default function useDueReminder(schedules, divisi) {
           playReminderSound(schedule.kategori);
 
           if (isSupported() && Notification.permission === 'granted') {
-            new Notification('Pengingat jadwal', { body, tag: noticeKey });
+            // Jangan pernah memakai new Notification() langsung: Chrome mobile
+            // dan PWA melempar "Illegal constructor" yang menghancurkan halaman.
+            void notifyNow({ title: 'Pengingat jadwal', body, tag: noticeKey }).catch(
+              (error) => console.warn('[pengingat] notifikasi lokal gagal:', error)
+            );
           }
         });
       });
