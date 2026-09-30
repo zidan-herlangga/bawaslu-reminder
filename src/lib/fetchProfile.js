@@ -16,11 +16,29 @@ export default async function fetchProfile(session) {
   if (data) return data;
 
   const meta = session.user.user_metadata ?? {};
-  return {
+  const fallback = {
     nama_lengkap: meta.nama_lengkap ?? session.user.email ?? '',
     divisi: meta.divisi ?? 'Belum diatur',
     jabatan: meta.jabatan ?? 'Belum diatur',
     role_akses: 'Staf',
     status_akun: 'Aktif',
   };
+
+  // Pendaftaran dengan konfirmasi email tidak menyisipkan baris profiles
+  // (signUp tidak mengembalikan sesi sehingga insert dibatalkan), jadi
+  // barisnya dibuat sekali di sini. Tanpa baris ini nama pengguna tidak
+  // muncul sebagai penerima pengingat.
+  const { error: insertError } = await supabase.from('profiles').insert({
+    id: session.user.id,
+    email: session.user.email ?? '',
+    ...fallback,
+  });
+
+  if (insertError) {
+    console.warn('[profile] gagal membuat baris profil:', insertError.message);
+  } else {
+    console.info('[profile] baris profil dibuat otomatis');
+  }
+
+  return fallback;
 }
