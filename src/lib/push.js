@@ -58,6 +58,51 @@ export function isPushReady() {
   return Boolean(VAPID_PUBLIC_KEY) && isPushSupported() && Notification.permission === 'granted';
 }
 
+async function saveSubscription(session, subscription) {
+  const json = subscription.toJSON();
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    return { ok: false, reason: 'bad-subscription' };
+  }
+
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    {
+      user_id: session.user.id,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+    },
+    { onConflict: 'endpoint' }
+  );
+
+  if (!error) return { ok: true, reason: 'subscribed' };
+
+  const rls = /row-level security/i.test(error.message);
+  return {
+    ok: false,
+    reason: 'save-failed',
+    message: rls
+      ? 'Endpoint browser ini sudah tercatat untuk akun lain. Keluar lalu masuk kembali, lalu aktifkan ulang.'
+      : error.message,
+  };
+}
+
+async function subscribeFresh(registration) {
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  } catch (subscribeError) {
+    const message = String(subscribeError?.message || subscribeError);
+    if (!/applicationServerKey|gcm_sender_id/i.test(message)) throw subscribeError;
+    await dropSubscription(await registration.pushManager.getSubscription());
+    return registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+}
+
 export async function ensurePushSubscription(session) {
   if (!session?.user) return { ok: false, reason: 'no-session' };
   if (!VAPID_PUBLIC_KEY) return { ok: false, reason: 'no-vapid-key' };
@@ -66,42 +111,19 @@ export async function ensurePushSubscription(session) {
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+
     let subscription = await resolveSubscription(registration);
-
-    if (!subscription) {
-      try {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-      } catch (subscribeError) {
-        const message = String(subscribeError?.message || subscribeError);
-        if (!/applicationServerKey|gcm_sender_id/i.test(message)) throw subscribeError;
-        await dropSubscription(await registration.pushManager.getSubscription());
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-      }
+    if (subscription) {
+      const saved = await saveSubscription(session, subscription);
+      if (saved.ok) return saved;
+      // Endpoint lama sudah tercatat untuk akun lain -> putar langganan supaya
+      // dapat endpoint baru dan baris INSERT baru milik sendiri.
+      await dropSubscription(subscription);
+      subscription = null;
     }
 
-    const json = subscription.toJSON();
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-      return { ok: false, reason: 'bad-subscription' };
-    }
-
-    const { error } = await supabase.from('push_subscriptions').upsert(
-      {
-        user_id: session.user.id,
-        endpoint: json.endpoint,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-      },
-      { onConflict: 'endpoint' }
-    );
-
-    if (error) return { ok: false, reason: 'save-failed', message: error.message };
-    return { ok: true, reason: 'subscribed' };
+    subscription = await subscribeFresh(registration);
+    return await saveSubscription(session, subscription);
   } catch (error) {
     return { ok: false, reason: 'error', message: error?.message ?? String(error) };
   }
