@@ -4,7 +4,15 @@ import ErrorBoundary from './ErrorBoundary';
 import useSession from '../hooks/useSession';
 import { supabase } from '../lib/supabase';
 import { enablePush, ensurePushSubscription, isPushReady, notifyNow } from '../lib/push';
-import { isSoundEnabled, playChime, playReminderSound, setSoundEnabled, subscribeSound } from '../lib/sound';
+import {
+  isSoundBusy,
+  isSoundEnabled,
+  playChime,
+  playReminderSound,
+  setSoundEnabled,
+  subscribeSound,
+  subscribeSoundBusy,
+} from '../lib/sound';
 import { showToast, subscribeToast } from '../lib/toast';
 
 const APP_PATHS = ['/', '/kalender', '/todo', '/jadwal/baru', '/akun'];
@@ -147,6 +155,7 @@ export default function AppShell() {
   const { session, signOut } = useSession({ redirect: false });
 
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -164,13 +173,14 @@ export default function AppShell() {
   const unread = notifs.filter((item) => !item.dibaca).length;
 
   useEffect(() => subscribeSound(setSoundOn), []);
+  useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
   const loadNotifications = useCallback(async () => {
     if (!session) return;
     setNotifLoading(true);
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, judul, pesan, dibaca, created_at')
+      .select('id, judul, pesan, dibaca, created_at, jadwal_id, schedules(kategori)')
       .order('created_at', { ascending: false })
       .limit(30);
 
@@ -194,8 +204,9 @@ export default function AppShell() {
 
       fresh.forEach((item) => {
         if (silencedRef.current.delete(item.id)) return;
+        const kategori = item.schedules?.kategori;
         void (async () => {
-          await playReminderSound();
+          await playReminderSound(kategori);
           await notifyNow({
             title: item.judul || 'Pengingat jadwal',
             body: item.pesan,
@@ -297,6 +308,7 @@ export default function AppShell() {
   };
 
   const toggleSound = () => {
+    if (soundBusy) return;
     const next = !soundOn;
     setSoundEnabled(next);
     if (next) playChime();
@@ -362,10 +374,11 @@ export default function AppShell() {
               <button
                 type="button"
                 onClick={toggleSound}
+                disabled={soundBusy}
                 aria-pressed={soundOn}
                 aria-label={soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'}
-                title={soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'}
-                className={`${ICON_BUTTON_CLASS} ${soundOn ? 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue' : ''}`}
+                title={soundBusy ? 'Tunggu nada selesai' : soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'}
+                className={`${ICON_BUTTON_CLASS} ${soundOn ? 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 {soundOn ? (
                   <IconVolumeOn className="h-[18px] w-[18px]" />

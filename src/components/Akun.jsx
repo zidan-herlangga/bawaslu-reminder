@@ -3,7 +3,14 @@ import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
 import fetchProfile from '../lib/fetchProfile';
-import { isSoundEnabled, playChime, setSoundEnabled, subscribeSound } from '../lib/sound';
+import {
+  isSoundBusy,
+  isSoundEnabled,
+  playChime,
+  setSoundEnabled,
+  subscribeSound,
+  subscribeSoundBusy,
+} from '../lib/sound';
 import { DIVISI_OPTIONS, JABATAN_OPTIONS, MIN_PASSWORD_LENGTH } from '../constants/options';
 
 const ROW_CLASS = 'flex items-start justify-between gap-4 py-3';
@@ -28,6 +35,7 @@ export default function Akun() {
   const { session, loading, signOut } = useSession();
   const [profile, setProfile] = useState(null);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
 
   const [editOpen, setEditOpen] = useState(false);
   const [profForm, setProfForm] = useState({
@@ -45,6 +53,7 @@ export default function Akun() {
   const reminder = useDueReminder([]);
 
   useEffect(() => subscribeSound(setSoundOn), []);
+  useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
   useEffect(() => {
     if (!session) return;
@@ -76,6 +85,7 @@ export default function Akun() {
   const jabatan = profile?.jabatan || 'Belum diatur';
 
   const toggleSound = () => {
+    if (soundBusy) return;
     const next = !soundOn;
     setSoundEnabled(next);
     if (next) playChime();
@@ -328,9 +338,10 @@ export default function Akun() {
         <button
           type="button"
           onClick={toggleSound}
+          disabled={soundBusy}
           role="switch"
           aria-checked={soundOn}
-          className="mt-3 flex w-full items-center justify-between gap-4 rounded-lg border border-bw-line bg-bw-surface px-3.5 py-3 text-left transition-colors hover:border-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+          className="mt-3 flex w-full items-center justify-between gap-4 rounded-lg border border-bw-line bg-bw-surface px-3.5 py-3 text-left transition-colors hover:border-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span>
             <span className="block text-[13px] font-semibold text-bw-ink">

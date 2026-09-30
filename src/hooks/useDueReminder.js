@@ -46,7 +46,7 @@ export default function useDueReminder(schedules, divisi) {
           const minutes = Math.max(1, Math.round(remaining / 60000));
           const body = `${schedule.judul} dimulai ${minutes} menit lagi.`;
 
-          playReminderSound();
+          playReminderSound(schedule.kategori);
 
           if (isSupported() && Notification.permission === 'granted') {
             new Notification('Pengingat jadwal', { body, tag: noticeKey });

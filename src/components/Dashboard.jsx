@@ -7,7 +7,7 @@ import useDueReminder from '../hooks/useDueReminder';
 import ClockWidget from './ClockWidget';
 import AddToCalendar from './AddToCalendar';
 import { notifyNow, sendRemind } from '../lib/push';
-import { playReminderSound } from '../lib/sound';
+import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
 import { showToast } from '../lib/toast';
 import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
@@ -64,6 +64,9 @@ export default function Dashboard() {
   const [divisiFilter, setDivisiFilter] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [remind, setRemind] = useState({ id: '', status: '', message: '' });
+  const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
+
+  useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
   const reminder = useDueReminder(schedules, profile?.divisi);
 
@@ -84,7 +87,7 @@ export default function Dashboard() {
       const slots = sortSlots(getSlots(schedule));
       const waktu = slots.length ? formatWaktu(slots[0].mulai) : '';
 
-      await playReminderSound();
+      await playReminderSound(schedule.kategori);
       await notifyNow({
         title: 'Pengingat jadwal',
         body: waktu ? `${schedule.judul} - ${waktu}` : schedule.judul,
@@ -387,7 +390,10 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => handleRemind(schedule)}
-                          disabled={remind.id === schedule.id && remind.status === 'busy'}
+                          disabled={
+                            soundBusy ||
+                            (remind.id === schedule.id && remind.status === 'busy')
+                          }
                           className="text-[11px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:text-bw-muted disabled:no-underline"
                         >
                           {remind.id === schedule.id && remind.status === 'busy'

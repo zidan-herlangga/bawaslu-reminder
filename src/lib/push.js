@@ -13,6 +13,38 @@ function urlBase64ToUint8Array(base64String) {
   return output;
 }
 
+function arrayBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer || []);
+  let raw = '';
+  bytes.forEach((byte) => {
+    raw += String.fromCharCode(byte);
+  });
+  return window.btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Browser menolak mengganti applicationServerKey pada langganan lama, jadi
+// langganan dengan kunci VAPID berbeda harus dilepas dulu (baru disubscribe
+// ulang), dan baris endpoint lama dihapus agar tidak dikirim push mati.
+async function dropSubscription(subscription) {
+  if (!subscription) return;
+  const oldEndpoint = subscription.toJSON().endpoint;
+  await subscription.unsubscribe().catch(() => {});
+  if (oldEndpoint) {
+    await supabase.from('push_subscriptions').delete().eq('endpoint', oldEndpoint);
+  }
+}
+
+async function resolveSubscription(registration) {
+  const existing = await registration.pushManager.getSubscription();
+  if (!existing) return null;
+
+  const currentKey = arrayBufferToBase64Url(existing.options?.applicationServerKey);
+  if (currentKey && currentKey === VAPID_PUBLIC_KEY) return existing;
+
+  await dropSubscription(existing);
+  return null;
+}
+
 export function isPushSupported() {
   return (
     typeof window !== 'undefined' &&
@@ -34,10 +66,24 @@ export async function ensurePushSubscription(session) {
 
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
+    let subscription = await resolveSubscription(registration);
+
+    if (!subscription) {
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      } catch (subscribeError) {
+        const message = String(subscribeError?.message || subscribeError);
+        if (!/applicationServerKey|gcm_sender_id/i.test(message)) throw subscribeError;
+        await dropSubscription(await registration.pushManager.getSubscription());
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+    }
 
     const json = subscription.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
