@@ -66,10 +66,10 @@ export default function LupaPassword() {
       <div className="w-full max-w-sm">
         <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
           <div className="border-b border-bw-line pb-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-bw-red">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Lupa Kata Sandi
             </p>
-            <h1 className="mt-1 text-lg font-bold leading-snug text-bw-ink">
+            <h1 className="mt-1 font-display text-xl font-bold leading-snug text-bw-ink">
               Atur Ulang Password
             </h1>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
@@ -133,7 +133,7 @@ export default function LupaPassword() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-[11px] leading-relaxed text-bw-muted">
+        <p className="mt-4 text-center text-xs leading-relaxed text-bw-muted">
           Aplikasi internal Bawaslu Kota Bekasi dengan akses terbatas.
         </p>
       </div>

@@ -152,7 +152,7 @@ const ICON_BUTTON_CLASS =
   'grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-bw-line bg-white text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40';
 
 const NAV_BASE =
-  'flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors';
+  'flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors';
 
 export default function AppShell() {
   const location = useLocation();
@@ -380,7 +380,7 @@ export default function AppShell() {
 
   return (
     <div className="flex min-h-dvh justify-center bg-bw-canvas">
-      <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-[0_0_50px_rgba(0,0,0,0.18)] ring-1 ring-black/5">
+      <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-[0_0_50px_rgba(0,0,0,0.18)] ring-1 ring-black/5 lg:max-w-[860px]">
         <div className="bw-marquee shrink-0 overflow-hidden bg-bw-ink py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/55">
           <span className="sr-only">
             Bawaslu Kota Bekasi - Sistem Pengingat Jadwal
@@ -391,16 +391,22 @@ export default function AppShell() {
           </div>
         </div>
 
-        <header className="relative z-10 flex shrink-0 justify-between items-center gap-3 border-b border-bw-line bg-white px-4 py-3">
-          <img
-            src="/logo-bawaslu.png"
-            alt="Logo Bawaslu"
-            className="h-11 w-auto shrink-0 object-contain"
-            width={132}
-            height={44}
-          />
-          
-
+        <header className="relative z-10 flex shrink-0 justify-between items-center gap-3 border-b border-bw-line bg-white px-4 py-3 lg:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <img
+              src="/logo-bawaslu.png"
+              alt="Logo Bawaslu"
+              className="h-10 w-auto shrink-0 object-contain"
+              width={132}
+              height={44}
+            />
+            <div className="min-w-0 leading-tight">
+              <p className="font-display text-[15px] font-bold text-bw-ink">
+                Pengingat Jadwal
+              </p>
+              <p className="truncate text-xs text-bw-muted">Bawaslu Kota Bekasi</p>
+            </div>
+          </div>
           {session && (
             <div className="flex shrink-0 items-center gap-1.5">
               <button
@@ -422,7 +428,7 @@ export default function AppShell() {
               >
                 <IconBell className="h-[18px] w-[18px]" />
                 {unread > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 min-w-[16px] rounded-full bg-bw-red px-1 text-center text-[9px] font-bold leading-4 text-white ring-2 ring-white">
+                  <span className="absolute -right-1.5 -top-1.5 min-w-[16px] rounded-full bg-bw-red px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-white">
                     {unread > 9 ? '9+' : unread}
                   </span>
                 )}
@@ -469,7 +475,7 @@ export default function AppShell() {
                     <button
                       type="button"
                       onClick={markAllRead}
-                      className="text-[11px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                      className="text-xs font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                     >
                       Tandai semua
                     </button>
@@ -487,7 +493,7 @@ export default function AppShell() {
 
               <div className="max-h-[55vh] overflow-y-auto overscroll-contain">
                 {notifError && (
-                  <p className="m-3 rounded-lg bg-bw-red-50 px-3 py-2 text-[11px] leading-relaxed text-bw-red">
+                  <p className="m-3 rounded-lg bg-bw-red-50 px-3 py-2 text-xs leading-relaxed text-bw-red">
                     {notifError}
                   </p>
                 )}
@@ -531,10 +537,10 @@ export default function AppShell() {
                             >
                               {item.judul}
                             </span>
-                            <span className="mt-0.5 block whitespace-pre-line break-words text-[11px] leading-snug text-bw-muted">
+                            <span className="mt-0.5 block whitespace-pre-line break-words text-xs leading-snug text-bw-muted">
                               {item.pesan}
                             </span>
-                            <span className="mt-1 block text-[10px] text-bw-muted">
+                            <span className="mt-1 block text-[11px] text-bw-muted">
                               {formatLalu(item.created_at)}
                             </span>
                           </span>
@@ -547,7 +553,7 @@ export default function AppShell() {
 
               <div className="border-t border-bw-line bg-bw-surface px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] leading-snug text-bw-muted">
+                  <p className="text-xs leading-snug text-bw-muted">
                     {pushOn
                       ? 'Notifikasi browser aktif.'
                       : 'Notifikasi browser masih nonaktif.'}
@@ -557,7 +563,7 @@ export default function AppShell() {
                       type="button"
                       onClick={handleEnablePush}
                       disabled={pushBusy}
-                      className="shrink-0 rounded-lg bg-bw-blue px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="shrink-0 rounded-lg bg-bw-blue px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {pushBusy ? 'Memproses...' : 'Aktifkan'}
                     </button>
@@ -569,7 +575,7 @@ export default function AppShell() {
         </header>
 
         <main
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 ${
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 lg:px-6 ${
             showNav ? 'py-4' : 'py-6'
           }`}
         >
@@ -580,7 +586,7 @@ export default function AppShell() {
 
         {showNav && (
           <nav className="safe-bottom shrink-0 border-t border-bw-line bg-white pt-1">
-            <ul className="grid grid-cols-5">
+            <ul className="mx-auto grid max-w-[560px] grid-cols-5">
               {navItems.map(({ to, label, icon: Icon, end }) => (
                 <li key={to}>
                   <NavLink

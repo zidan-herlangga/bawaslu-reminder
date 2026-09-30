@@ -182,16 +182,16 @@ export default function Kalender() {
   const todayKey = ymd(today);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <ChevronButton direction="left" onClick={() => goMonth(-1)} label="Bulan sebelumnya" />
 
           <div className="min-w-0 flex-1 text-center">
-            <p className="truncate text-[15px] font-bold capitalize text-bw-ink">
+            <p className="truncate font-display text-[15px] font-bold capitalize text-bw-ink">
               {monthLabel}
             </p>
-            <p className="text-[11px] text-bw-muted">
+            <p className="text-xs text-bw-muted">
               {monthCount} jadwal bulan ini
             </p>
           </div>
@@ -203,7 +203,7 @@ export default function Kalender() {
           {WEEKDAYS.map((day) => (
             <div
               key={day}
-              className="pb-1 text-center text-[10px] font-bold uppercase tracking-wide text-bw-muted"
+              className="pb-1 text-center text-[11px] font-bold uppercase tracking-wide text-bw-muted"
             >
               {day}
             </div>
@@ -250,7 +250,7 @@ export default function Kalender() {
           })}
         </div>
 
-        <div className="mt-3 flex items-center gap-3 border-t border-bw-line pt-3 text-[10px] text-bw-muted">
+        <div className="mt-3 flex items-center gap-3 border-t border-bw-line pt-3 text-[11px] text-bw-muted">
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-bw-red" />
             Ada jadwal
@@ -271,10 +271,10 @@ export default function Kalender() {
 
       <section>
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <h2 className="text-[13px] font-bold capitalize text-bw-ink">
+          <h2 className="font-display text-[13px] font-bold capitalize text-bw-ink">
             {formatTanggalPanjang(selectedDate)}
           </h2>
-          <span className="shrink-0 text-[11px] text-bw-muted">
+          <span className="shrink-0 text-xs text-bw-muted">
             {selectedItems.length} jadwal
           </span>
         </div>
@@ -317,11 +317,11 @@ export default function Kalender() {
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-bw-blue-50 py-1.5">
-                      <span className="text-[13px] font-bold leading-none text-bw-blue-700">
+                      <span className="font-display text-[13px] font-bold leading-none text-bw-blue-700">
                         {formatJam(slot.mulai)}
                       </span>
                       {slot.selesai && (
-                        <span className="mt-1 text-[9px] leading-none text-bw-muted">
+                        <span className="mt-1 text-[10px] leading-none text-bw-muted">
                           {formatJam(slot.selesai)}
                         </span>
                       )}
@@ -330,11 +330,11 @@ export default function Kalender() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${style}`}
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${style}`}
                         >
                           {item.kategori}
                         </span>
-                        <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
+                        <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
                           {item.target_divisi
                             ? `Khusus ${
                                 DIVISI_SHORT[item.target_divisi] ?? item.target_divisi
@@ -342,12 +342,12 @@ export default function Kalender() {
                             : 'Semua staf'}
                         </span>
                         {totalSlots > 1 && (
-                          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
+                          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
                             {totalSlots} sesi
                           </span>
                         )}
                         {item.status !== 'Aktif' && (
-                          <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-bw-red ring-1 ring-bw-red-100">
+                          <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-red ring-1 ring-bw-red-100">
                             {item.status}
                           </span>
                         )}
@@ -364,14 +364,14 @@ export default function Kalender() {
                       )}
 
                       <div className="mt-2 flex items-center justify-between gap-2 border-t border-bw-line pt-1.5">
-                        <p className="min-w-0 truncate text-[10px] text-bw-muted">
+                        <p className="min-w-0 truncate text-[11px] text-bw-muted">
                           {item.pembuat_nama} -{' '}
                           {DIVISI_SHORT[item.pembuat_divisi] ?? item.pembuat_divisi}
                         </p>
                         {item.pembuat_id === session.user.id && (
                           <Link
                             to={`/jadwal/${item.id}/edit`}
-                            className="shrink-0 text-[10px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                            className="shrink-0 text-[11px] font-semibold text-bw-blue transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                           >
                             Edit
                           </Link>

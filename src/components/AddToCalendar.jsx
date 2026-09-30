@@ -2,7 +2,7 @@ import { downloadIcs, buildGoogleLink } from '../lib/calendar';
 import { getSlots, sortSlots } from '../lib/slots';
 
 const LINK_CLASS =
-  'inline-flex items-center rounded-full border border-bw-line bg-white px-2.5 py-1 text-[11px] font-semibold text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40';
+  'inline-flex items-center rounded-full border border-bw-line bg-white px-2.5 py-1 text-xs font-semibold text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40';
 
 export default function AddToCalendar({ schedule }) {
   const slots = sortSlots(getSlots(schedule));

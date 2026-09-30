@@ -206,23 +206,23 @@ export default function Akun() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="overflow-hidden rounded-xl border border-bw-line bg-white shadow-sm">
         <div className="flex items-center gap-3.5 border-b border-bw-line bg-bw-blue-50 px-4 py-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-bw-blue text-lg font-bold text-white ring-4 ring-white">
             {initialsOf(nama)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-bold text-bw-ink">{nama}</p>
+            <p className="truncate font-display text-[15px] font-bold text-bw-ink">{nama}</p>
             <p className="truncate text-xs text-bw-muted">{session.user.email}</p>
-            <span className="mt-1 inline-block rounded-full bg-bw-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            <span className="mt-1 inline-block rounded-full bg-bw-red px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
               {profile?.role_akses || 'Staf'}
             </span>
           </div>
           <button
             type="button"
             onClick={toggleEditProfile}
-            className="shrink-0 rounded-lg border border-bw-blue-200 bg-white px-3 py-2 text-[11px] font-bold text-bw-blue transition-colors hover:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+            className="shrink-0 rounded-lg border border-bw-blue-200 bg-white px-3 py-2 text-xs font-bold text-bw-blue transition-colors hover:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
           >
             {editOpen ? 'Batal' : 'Ubah'}
           </button>
@@ -331,7 +331,7 @@ export default function Akun() {
       </section>
 
       <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
-        <h2 className="text-[13px] font-bold uppercase tracking-wide text-bw-ink">
+        <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Pengaturan Pengingat
         </h2>
 
@@ -385,7 +385,7 @@ export default function Akun() {
       </section>
 
       <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
-        <h2 className="text-[13px] font-bold uppercase tracking-wide text-bw-ink">
+        <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Keamanan Akun
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-bw-muted">
@@ -454,7 +454,7 @@ export default function Akun() {
         Keluar dari akun
       </button>
 
-      <p className="pb-2 text-center text-[11px] leading-relaxed text-bw-muted">
+      <p className="pb-2 text-center text-xs leading-relaxed text-bw-muted">
         Aplikasi internal Bawaslu Kota Bekasi dengan akses terbatas.
       </p>
     </div>

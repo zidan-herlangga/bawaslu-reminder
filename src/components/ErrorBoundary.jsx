@@ -27,10 +27,10 @@ export default class ErrorBoundary extends Component {
 
     return (
       <div className="rounded-xl border border-bw-red-100 bg-white p-5 shadow-sm">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-bw-red">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
           Terjadi kesalahan
         </p>
-        <h2 className="mt-1 text-[15px] font-bold text-bw-ink">
+        <h2 className="mt-1 font-display text-[15px] font-bold text-bw-ink">
           Halaman gagal ditampilkan
         </h2>
         <p className="mt-2 break-words text-xs leading-relaxed text-bw-muted">

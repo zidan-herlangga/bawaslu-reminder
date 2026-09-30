@@ -2,6 +2,9 @@
 
 @theme {
   --font-sans: 'Arimo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Font display untuk judul, angka, dan label bagian - memberi karakter
+     pada antarmuka supaya tidak terasa seperti dokumen Arial biasa. */
+  --font-display: 'Space Grotesk', 'Arimo', ui-sans-serif, system-ui, sans-serif;
 
   --color-bw-blue: #037ac5;
   --color-bw-blue-hi: #048ce2;
@@ -17,7 +20,9 @@
 
   --color-bw-ink: #1e1e1e;
   --color-bw-ink-2: #2b2b2b;
-  --color-bw-muted: #7f7f7f;
+  /* #6b6b6b (bukan #7f7f7f) supaya teks kecil tetap lulus WCAG AA:
+     5,3:1 di putih dan 4,8:1 di kanvas #f2f2f2. */
+  --color-bw-muted: #6b6b6b;
   --color-bw-line: #e1e1e1;
   --color-bw-surface: #f7f7f7;
   --color-bw-canvas: #f2f2f2;

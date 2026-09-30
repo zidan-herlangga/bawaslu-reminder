@@ -28,7 +28,7 @@ const FIELD_OK_CLASS = 'border-bw-line focus:border-bw-blue focus:ring-bw-blue/2
 const FIELD_INVALID_CLASS = 'border-bw-red focus:ring-bw-red/25';
 
 const LABEL_CLASS = 'mb-1.5 block text-[13px] font-semibold text-bw-ink';
-const SUB_LABEL_CLASS = 'mb-1 block text-[11px] font-semibold text-bw-muted';
+const SUB_LABEL_CLASS = 'mb-1 block text-xs font-semibold text-bw-muted';
 
 const SLOT_ERROR_KEY = /^slot-\d+-(mulai|selesai)$/;
 
@@ -363,10 +363,10 @@ export default function ScheduleForm() {
     <div className="mx-auto w-full max-w-sm">
       <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-sm">
         <div className="border-b border-bw-line pb-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-bw-red">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
             {isEdit ? 'Ubah Jadwal' : 'Jadwal Baru'}
           </p>
-          <h1 className="mt-1 text-lg font-bold leading-snug text-bw-ink">
+          <h1 className="mt-1 font-display text-xl font-bold leading-snug text-bw-ink">
             {isEdit ? 'Edit Jadwal' : 'Buat Jadwal'}
           </h1>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
@@ -446,7 +446,7 @@ export default function ScheduleForm() {
                   />
                   <span className="min-w-0">
                     <span className="block text-[12px] font-bold text-bw-ink">{mode.label}</span>
-                    <span className="mt-0.5 block text-[10px] leading-snug text-bw-muted">
+                    <span className="mt-0.5 block text-[11px] leading-snug text-bw-muted">
                       {mode.hint}
                     </span>
                   </span>
@@ -485,7 +485,7 @@ export default function ScheduleForm() {
           <div>
             <div className="flex items-baseline justify-between gap-3">
               <span className={LABEL_CLASS}>Tanggal &amp; Jam</span>
-              <span className="text-[11px] font-semibold text-bw-muted">
+              <span className="text-xs font-semibold text-bw-muted">
                 {form.slots.length} sesi
               </span>
             </div>
@@ -499,14 +499,14 @@ export default function ScheduleForm() {
                   className="rounded-xl border border-bw-line bg-bw-surface p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-bw-muted">
+                    <span className="text-xs font-bold uppercase tracking-wide text-bw-muted">
                       Sesi {index + 1}
                     </span>
                     {form.slots.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeSlot(index)}
-                        className="text-[11px] font-bold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                        className="text-xs font-bold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
                       >
                         Hapus sesi
                       </button>

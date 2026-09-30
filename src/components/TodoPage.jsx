@@ -229,19 +229,19 @@ export default function TodoPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <section className="rounded-xl border border-bw-line bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3 border-b border-bw-line pb-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-bw-red">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Daftar Tugas
             </p>
-            <h1 className="mt-0.5 text-lg font-bold leading-snug text-bw-ink">Todo</h1>
+            <h1 className="mt-0.5 font-display text-xl font-bold leading-snug text-bw-ink">Todo</h1>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Catatan tugas pribadi Anda, terpisah dari jadwal bersama.
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-bw-blue-50 px-2.5 py-1 text-[11px] font-bold text-bw-blue-700 ring-1 ring-bw-blue-200">
+          <span className="shrink-0 rounded-full bg-bw-blue-50 px-2.5 py-1 text-xs font-bold text-bw-blue-700 ring-1 ring-bw-blue-200">
             {listLoading ? '-' : `${doneCount}/${visible.length}`}
           </span>
         </div>
@@ -257,7 +257,7 @@ export default function TodoPage() {
             onChange={(event) => setTanggal(event.target.value || today)}
             className={FIELD_CLASS}
           />
-          <p className="mt-1.5 text-[11px] text-bw-muted">{formatTanggalPanjang(tanggal)}</p>
+          <p className="mt-1.5 text-xs text-bw-muted">{formatTanggalPanjang(tanggal)}</p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-bw-surface p-1">
@@ -308,10 +308,10 @@ export default function TodoPage() {
 
       <section>
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <h2 className="text-[13px] font-bold capitalize text-bw-ink">
+          <h2 className="font-display text-[13px] font-bold capitalize text-bw-ink">
             {tab === 'tanggal' ? formatTanggalPanjang(tanggal) : 'Semua todo'}
           </h2>
-          <span className="shrink-0 text-[11px] text-bw-muted">
+          <span className="shrink-0 text-xs text-bw-muted">
             {visible.length} tugas
           </span>
         </div>
@@ -369,14 +369,14 @@ export default function TodoPage() {
                       <div className="mt-1.5 flex gap-1.5">
                         <button
                           type="submit"
-                          className="rounded-lg bg-bw-blue px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          className="rounded-lg bg-bw-blue px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                         >
                           Simpan
                         </button>
                         <button
                           type="button"
                           onClick={cancelEdit}
-                          className="rounded-lg border border-bw-line bg-white px-3 py-1.5 text-[11px] font-bold text-bw-muted transition-colors hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          className="rounded-lg border border-bw-line bg-white px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                         >
                           Batal
                         </button>
@@ -393,7 +393,7 @@ export default function TodoPage() {
                         {todo.teks}
                       </label>
                       {tab === 'semua' && (
-                        <p className="mt-1 text-[11px] text-bw-muted">
+                        <p className="mt-1 text-xs text-bw-muted">
                           {formatTanggalPanjang(todo.tanggal)}
                         </p>
                       )}
