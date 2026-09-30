@@ -73,9 +73,10 @@ export default function Dashboard() {
   const handleRemind = async (schedule) => {
     setRemind({ id: schedule.id, status: 'busy', message: '' });
 
-    // Minta izin di detik klik, saat gesture user masih berlaku.
+    // Minta izin di detik klik, saat gesture user masih berlaku, lalu tunggu
+    // hasilnya supaya notifyNow tidak jalan saat izinnya masih default.
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
+      await Notification.requestPermission().catch(() => {});
     }
 
     try {
@@ -410,7 +411,20 @@ export default function Dashboard() {
                           type="button"
                           onClick={async () => {
                             if (!window.confirm('Hapus jadwal ini?')) return;
-                            await supabase.from('schedules').delete().eq('id', schedule.id);
+                            const { data, error } = await supabase
+                              .from('schedules')
+                              .delete()
+                              .eq('id', schedule.id)
+                              .select('id');
+                            if (error || !data?.length) {
+                              showToast(
+                                error?.message ??
+                                  'Jadwal tidak terhapus (0 baris terpengaruh). Periksa aturan RLS di schema.sql.',
+                                'error'
+                              );
+                              return;
+                            }
+                            showToast('Jadwal dihapus.', 'success');
                             loadSchedules();
                           }}
                           className="text-[11px] font-semibold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"

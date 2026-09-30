@@ -30,7 +30,8 @@ async function dropSubscription(subscription) {
   const oldEndpoint = subscription.toJSON().endpoint;
   await subscription.unsubscribe().catch(() => {});
   if (oldEndpoint) {
-    await supabase.from('push_subscriptions').delete().eq('endpoint', oldEndpoint);
+    const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', oldEndpoint);
+    if (error) console.warn('[push] langganan lama gagal dihapus dari server:', error.message);
   }
 }
 
@@ -144,11 +145,13 @@ export async function notifyNow({ title, body, tag, url = '/' }) {
     return { ok: false, reason: 'unsupported' };
   }
 
-  if (Notification.permission === 'default') {
-    const result = await Notification.requestPermission().catch(() => 'denied');
-    if (result !== 'granted') return { ok: false, reason: result };
+  // Permintaan izin hanya boleh datang dari gesture pengguna (tombol "Izinkan"
+  // atau tombol Ingatkan). Memanggil requestPermission() dari pengecekan
+  // latar belakang membuat prompt muncul seenaknya dan Chrome bisa
+  // menolaknya diam-diam, sehingga hasilnya beda antara lokal dan produksi.
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: Notification.permission };
   }
-  if (Notification.permission !== 'granted') return { ok: false, reason: 'denied' };
 
   const options = {
     body: body || '',
@@ -183,11 +186,23 @@ export async function notifyNow({ title, body, tag, url = '/' }) {
 }
 
 export async function sendRemind(scheduleId, session) {
+  // Objek session di memori bisa berisi access token yang sudah kedaluwarsa,
+  // terutama di PWA yang dibiarkan terbuka lama. Baca sesi terbaru dulu supaya
+  // tidak kena 401 sesaat yang hanya muncul di kondisi tertentu.
+  let token = session?.access_token;
+  try {
+    const { data } = await supabase.auth.getSession();
+    token = data?.session?.access_token ?? token;
+  } catch (error) {
+    console.warn('[push] gagal memperbarui sesi, pakai token lama:', error?.message);
+  }
+  if (!token) throw new Error('Sesi berakhir. Silakan keluar lalu masuk kembali.');
+
   const response = await fetch('/api/notify', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ scheduleId }),
   });
