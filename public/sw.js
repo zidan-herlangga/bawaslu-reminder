@@ -1,3 +1,20 @@
+function broadcastShown(id) {
+  if (!id) return Promise.resolve();
+
+  return self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((list) => {
+      list.forEach((client) => {
+        try {
+          client.postMessage({ type: 'bawaslu-push-shown', id: String(id) });
+        } catch {
+          /* abaikan */
+        }
+      });
+    })
+    .catch(() => {});
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
 
@@ -12,12 +29,17 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: payload.tag || 'bawaslu-reminder',
+    tag: payload.tag || payload.id || 'bawaslu-reminder',
     renotify: true,
     data: { url: payload.url || '/' },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      broadcastShown(payload.id),
+    ])
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

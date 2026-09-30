@@ -6,7 +6,9 @@ import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
 import ClockWidget from './ClockWidget';
 import AddToCalendar from './AddToCalendar';
-import { sendRemind } from '../lib/push';
+import { notifyNow, sendRemind } from '../lib/push';
+import { playReminderSound } from '../lib/sound';
+import { showToast } from '../lib/toast';
 import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
 
@@ -68,17 +70,38 @@ export default function Dashboard() {
   const handleRemind = async (schedule) => {
     setRemind({ id: schedule.id, status: 'busy', message: '' });
 
+    // Minta izin di detik klik, saat gesture user masih berlaku.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+
     try {
       const result = await sendRemind(schedule.id, session);
       const catatan = result.catatan ? ` ${result.catatan}` : '';
-      setRemind({
-        id: schedule.id,
-        status: 'ok',
-        message: `Pengingat terkirim ke ${result.terkirim} penerima, ${result.push} notifikasi browser.${catatan}`,
+      const message = `Pengingat terkirim ke ${result.terkirim} penerima, ${result.push} notifikasi browser.${catatan}`;
+      setRemind({ id: schedule.id, status: 'ok', message });
+
+      const slots = sortSlots(getSlots(schedule));
+      const waktu = slots.length ? formatWaktu(slots[0].mulai) : '';
+
+      await playReminderSound();
+      await notifyNow({
+        title: 'Pengingat jadwal',
+        body: waktu ? `${schedule.judul} - ${waktu}` : schedule.judul,
+        tag: `remind-${schedule.id}-${Date.now()}`,
       });
+
+      showToast(
+        result.terkirim > 0
+          ? `Pengingat dikirim ke ${result.terkirim} penerima.`
+          : 'Pengingat diproses.',
+        'success'
+      );
     } catch (error) {
       console.error('[Dashboard] kirim pengingat gagal:', error?.message);
-      setRemind({ id: schedule.id, status: 'error', message: error?.message ?? 'Gagal mengirim.' });
+      const message = error?.message ?? 'Gagal mengirim pengingat.';
+      setRemind({ id: schedule.id, status: 'error', message });
+      showToast(message, 'error');
     }
   };
 

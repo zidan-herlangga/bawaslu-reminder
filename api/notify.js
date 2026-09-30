@@ -60,11 +60,12 @@ export default async function handler(req, res) {
 
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
   if (missing.length > 0) {
+    const where = process.env.VERCEL
+      ? 'Buka Vercel > Project > Settings > Environment Variables.'
+      : 'Isi di file .env lalu restart dev server (npm run dev).';
     return reply(res, 500, {
       error:
-        'Variabel environment Vercel belum diisi: ' +
-        missing.join(', ') +
-        '. Buka Vercel > Project > Settings > Environment Variables.',
+        'Variabel environment belum diisi: ' + missing.join(', ') + '. ' + where,
     });
   }
 
@@ -121,8 +122,13 @@ export default async function handler(req, res) {
     target_divisi: schedule.target_divisi,
   }));
 
-  const { error: insertError } = await admin.from('notifications').insert(rows);
+  const { data: inserted, error: insertError } = await admin
+    .from('notifications')
+    .insert(rows)
+    .select('id, penerima_id');
   if (insertError) return reply(res, 500, { error: insertError.message });
+
+  const idByUser = new Map((inserted ?? []).map((row) => [row.penerima_id, row.id]));
 
   const recipientIds = recipients.map((item) => item.id);
   const { data: subscriptions, error: subError } = await admin
@@ -154,16 +160,17 @@ export default async function handler(req, res) {
     process.env.VAPID_PRIVATE_KEY
   );
 
-  const payload = JSON.stringify({
-    title: 'Pengingat jadwal',
-    body: pesan,
-    url: '/',
-  });
-
   const expired = [];
   const results = await Promise.allSettled(
-    subscriptions.map((item) =>
-      webpush
+    subscriptions.map((item) => {
+      const payload = JSON.stringify({
+        title: 'Pengingat jadwal',
+        body: pesan,
+        url: '/',
+        id: idByUser.get(item.user_id) ?? null,
+      });
+
+      return webpush
         .sendNotification(
           { endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth } },
           payload
@@ -172,8 +179,8 @@ export default async function handler(req, res) {
           const status = error?.statusCode;
           if (status === 404 || status === 410) expired.push(item.endpoint);
           throw error;
-        })
-    )
+        });
+    })
   );
 
   if (expired.length > 0) {

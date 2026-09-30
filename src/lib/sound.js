@@ -63,8 +63,22 @@ function ensureNotificationLoaded() {
   return loadPromise;
 }
 
+function armAudioOnGesture() {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || unlockArmed) return;
+
+  const boot = () => {
+    getAudioContext();
+    ensureNotificationLoaded();
+    document.removeEventListener('pointerdown', boot, true);
+    document.removeEventListener('keydown', boot, true);
+  };
+
+  document.addEventListener('pointerdown', boot, { once: true, capture: true, passive: true });
+  document.addEventListener('keydown', boot, { once: true, capture: true });
+}
+
 if (typeof window !== 'undefined') {
-  ensureNotificationLoaded();
+  armAudioOnGesture();
 }
 
 function playSource(context, buffer, volume) {

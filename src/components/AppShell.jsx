@@ -1,12 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
 import useSession from '../hooks/useSession';
 import { supabase } from '../lib/supabase';
-import { enablePush, ensurePushSubscription, isPushReady } from '../lib/push';
-import { isSoundEnabled, playChime, setSoundEnabled, subscribeSound } from '../lib/sound';
+import { enablePush, ensurePushSubscription, isPushReady, notifyNow } from '../lib/push';
+import { isSoundEnabled, playChime, playReminderSound, setSoundEnabled, subscribeSound } from '../lib/sound';
+import { showToast, subscribeToast } from '../lib/toast';
 
 const APP_PATHS = ['/', '/kalender', '/todo', '/jadwal/baru', '/akun'];
+const NOTIF_POLL_MS = 15 * 1000;
+
+const TOAST_TONE = {
+  error: 'bg-bw-red text-white ring-bw-red-100',
+  success: 'bg-bw-ink text-white ring-black/10',
+  info: 'bg-bw-blue text-white ring-bw-blue-200',
+};
 
 function formatLalu(iso) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -145,6 +153,11 @@ export default function AppShell() {
   const [notifError, setNotifError] = useState('');
   const [pushOn, setPushOn] = useState(() => isPushReady());
   const [pushBusy, setPushBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const seenRef = useRef(new Set());
+  const silencedRef = useRef(new Set());
+  const primedRef = useRef(false);
 
   const inApp = APP_PATHS.includes(location.pathname);
   const showNav = Boolean(session) && inApp;
@@ -170,7 +183,26 @@ export default function AppShell() {
       );
     } else {
       setNotifError('');
-      setNotifs(data ?? []);
+      const rows = data ?? [];
+      const fresh = primedRef.current
+        ? rows.filter((item) => !seenRef.current.has(item.id))
+        : [];
+
+      seenRef.current = new Set(rows.map((item) => item.id));
+      primedRef.current = true;
+      setNotifs(rows);
+
+      fresh.forEach((item) => {
+        if (silencedRef.current.delete(item.id)) return;
+        void (async () => {
+          await playReminderSound();
+          await notifyNow({
+            title: item.judul || 'Pengingat jadwal',
+            body: item.pesan,
+            tag: item.id,
+          });
+        })();
+      });
     }
     setNotifLoading(false);
   }, [session]);
@@ -179,12 +211,35 @@ export default function AppShell() {
     if (!session) {
       setNotifs([]);
       setNotifOpen(false);
+      primedRef.current = false;
+      seenRef.current = new Set();
+      silencedRef.current = new Set();
       return;
     }
     loadNotifications();
-    const timer = setInterval(loadNotifications, 60000);
+    const timer = setInterval(loadNotifications, NOTIF_POLL_MS);
     return () => clearInterval(timer);
   }, [session, loadNotifications]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return undefined;
+    const onMessage = (event) => {
+      const data = event.data;
+      if (data && data.type === 'bawaslu-push-shown' && data.id) {
+        silencedRef.current.add(String(data.id));
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+
+  useEffect(() => subscribeToast((item) => setToast(item)), []);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!session || !isPushReady()) return;
@@ -482,6 +537,22 @@ export default function AppShell() {
               ))}
             </ul>
           </nav>
+        )}
+
+        {toast && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute inset-x-3 bottom-20 z-40 flex justify-center"
+          >
+            <p
+              className={`max-w-full rounded-xl px-3.5 py-2.5 text-center text-xs font-semibold leading-snug shadow-lg ring-1 ${
+                TOAST_TONE[toast.tone] || TOAST_TONE.info
+              }`}
+            >
+              {toast.message}
+            </p>
+          </div>
         )}
       </div>
     </div>

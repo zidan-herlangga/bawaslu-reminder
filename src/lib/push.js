@@ -71,6 +71,44 @@ export async function enablePush(session) {
   return ensurePushSubscription(session);
 }
 
+export async function notifyNow({ title, body, tag, url = '/' }) {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return { ok: false, reason: 'unsupported' };
+  }
+
+  if (Notification.permission === 'default') {
+    const result = await Notification.requestPermission().catch(() => 'denied');
+    if (result !== 'granted') return { ok: false, reason: result };
+  }
+  if (Notification.permission !== 'granted') return { ok: false, reason: 'denied' };
+
+  const options = {
+    body: body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: tag || `bawaslu-${Date.now()}`,
+    renotify: true,
+    data: { url },
+  };
+
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration?.();
+    if (registration?.showNotification) {
+      await registration.showNotification(title, options);
+      return { ok: true, reason: 'sw' };
+    }
+  } catch {
+    /* lanjut ke fallback */
+  }
+
+  try {
+    new Notification(title, options);
+    return { ok: true, reason: 'direct' };
+  } catch (error) {
+    return { ok: false, reason: 'error', message: error?.message ?? String(error) };
+  }
+}
+
 export async function sendRemind(scheduleId, session) {
   const response = await fetch('/api/notify', {
     method: 'POST',
@@ -83,6 +121,14 @@ export async function sendRemind(scheduleId, session) {
 
   const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) throw new Error(data.error || `Permintaan gagal (HTTP ${response.status}).`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(
+        'Endpoint /api/notify tidak ditemukan. Di mode lokal jalankan `vercel dev` ' +
+          '(bukan `npm run dev`); di Vercel periksa bahwa deploy terbaru sudah selesai.'
+      );
+    }
+    throw new Error(data.error || `Permintaan gagal (HTTP ${response.status}).`);
+  }
   return data;
 }
