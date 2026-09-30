@@ -16,7 +16,11 @@ import {
 import { showToast, subscribeToast } from '../lib/toast';
 
 const APP_PATHS = ['/', '/kalender', '/todo', '/jadwal/baru', '/akun'];
+// Kanal realtime menarik notifikasi begitu baris masuk. Polling di bawah tetap
+// ada sebagai jaring pengaman; barunya baru dipakai setelah kanal terbukti
+// benar-benar mengantarkan event, supaya tidak pernah lebih lambat dari sekarang.
 const NOTIF_POLL_MS = 15 * 1000;
+const NOTIF_POLL_SLOW_MS = 60 * 1000;
 
 const TOAST_TONE = {
   error: 'bg-bw-red text-white ring-bw-red-100',
@@ -225,11 +229,63 @@ export default function AppShell() {
       primedRef.current = false;
       seenRef.current = new Set();
       silencedRef.current = new Set();
-      return;
+      return undefined;
     }
+
     loadNotifications();
-    const timer = setInterval(loadNotifications, NOTIF_POLL_MS);
-    return () => clearInterval(timer);
+
+    let disposed = false;
+    let timer = null;
+    let subscribed = false;
+    let proven = false;
+
+    const schedule = () => {
+      if (disposed) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(tick, subscribed && proven ? NOTIF_POLL_SLOW_MS : NOTIF_POLL_MS);
+    };
+
+    const tick = async () => {
+      if (disposed) return;
+      try {
+        await loadNotifications();
+      } catch (error) {
+        console.error('[AppShell] pemeriksaan notifikasi gagal:', error);
+      }
+      schedule();
+    };
+
+    const channel = supabase
+      .channel(`notifikasi-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `penerima_id=eq.${session.user.id}`,
+        },
+        () => {
+          proven = true;
+          schedule();
+          void loadNotifications();
+        }
+      )
+      .subscribe((status) => {
+        if (disposed) return;
+        subscribed = status === 'SUBSCRIBED';
+        if (!subscribed) proven = false;
+        console.info('[AppShell] kanal notifikasi realtime:', status);
+        schedule();
+      });
+
+    schedule();
+
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, [session, loadNotifications]);
 
   useEffect(() => {
