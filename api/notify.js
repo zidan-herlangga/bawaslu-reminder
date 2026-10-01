@@ -24,6 +24,22 @@ const BULAN = [
   'Desember',
 ];
 
+// Tiap kategori memakai judul notifikasi sendiri supaya penerima langsung
+// tahu jenis pengingat dari notifikasi, bukan harus membuka aplikasi dulu.
+// Nilai `tag` juga dibedakan supaya notifikasi kategori berbeda tidak saling
+// menggantikan di panel notifikasi perangkat.
+const NOTIFIKASI_PER_KATEGORI = {
+  Rapat: { judul: 'Pengingat Rapat', tag: 'bRi-rapat' },
+  Tugas: { judul: 'Pengingat Tugas', tag: 'bRi-tugas' },
+  Pengawasan: { judul: 'Pengawasan Jadwal', tag: 'bRi-pengawasan' },
+};
+
+const DEFAULT_NOTIFIKASI = { judul: 'Pengingat Jadwal', tag: 'bRi-jadwal' };
+
+function notifikasiUntuk(kategori) {
+  return NOTIFIKASI_PER_KATEGORI[kategori] ?? DEFAULT_NOTIFIKASI;
+}
+
 function jamWIB(iso) {
   const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
   const pad = (value) => String(value).padStart(2, '0');
@@ -87,7 +103,7 @@ export default async function handler(req, res) {
 
   const { data: schedule, error: scheduleError } = await admin
     .from('schedules')
-    .select('id, judul, waktu_mulai, target_divisi, pembuat_id')
+    .select('id, judul, kategori, waktu_mulai, target_divisi, pembuat_id')
     .eq('id', scheduleId)
     .maybeSingle();
 
@@ -105,6 +121,7 @@ export default async function handler(req, res) {
 
   const recipients = (profiles ?? []).filter((item) => item.id !== sender.id);
   const targetLabel = schedule.target_divisi ?? 'semua staf';
+  const label = notifikasiUntuk(schedule.kategori);
   const pesan =
     `${schedule.judul} - ${jamWIB(schedule.waktu_mulai)}. ` +
     `Ditujukan untuk ${targetLabel}.`;
@@ -117,7 +134,7 @@ export default async function handler(req, res) {
     jadwal_id: schedule.id,
     pengirim_id: sender.id,
     penerima_id: item.id,
-    judul: 'Pengingat jadwal',
+    judul: label.judul,
     pesan,
     target_divisi: schedule.target_divisi,
   }));
@@ -164,10 +181,12 @@ export default async function handler(req, res) {
   const results = await Promise.allSettled(
     subscriptions.map((item) => {
       const payload = JSON.stringify({
-        title: 'Pengingat jadwal',
+        title: label.judul,
         body: pesan,
         url: '/',
         id: idByUser.get(item.user_id) ?? null,
+        kategori: schedule.kategori ?? null,
+        tag: `${label.tag}-${idByUser.get(item.user_id) ?? item.user_id}`,
       });
 
       return webpush
