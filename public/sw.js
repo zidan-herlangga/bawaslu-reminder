@@ -31,6 +31,12 @@ self.addEventListener('push', (event) => {
     badge: '/icon-192.png',
     tag: payload.tag || payload.id || 'bawaslu-reminder',
     renotify: true,
+    // Service worker tidak bisa memutar audio, jadi suara hanya bisa dari OS.
+    // Ditulis eksplisit supaya tidak pernah ikut diam kalau setelan sistem
+    // sebelumnya menyalakan mode senyap untuk notifikasi ini.
+    silent: false,
+    requireInteraction: false,
+    vibrate: [180, 90, 180],
     data: { url: payload.url || '/' },
   };
 

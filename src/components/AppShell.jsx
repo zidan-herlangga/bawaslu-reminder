@@ -206,18 +206,27 @@ export default function AppShell() {
       primedRef.current = true;
       setNotifs(rows);
 
-      fresh.forEach((item) => {
-        if (silencedRef.current.delete(item.id)) return;
-        const kategori = item.schedules?.kategori;
-        void (async () => {
-          await playReminderSound(kategori);
-          await notifyNow({
-            title: item.judul || 'Pengingat jadwal',
-            body: item.pesan,
-            tag: item.id,
-          });
-        })();
-      });
+        fresh.forEach((item) => {
+          // Kalau push-nya sampai, service worker sudah menampilkan notifikasi
+          // native, jadi jangan tampilkan dua kali. Suara tetap dimainkan dari
+          // halaman ini karena service worker tidak bisa memutar audio: suara
+          // bawaan OS sering tidak berbunyi saat tab terlihat, dan channel yang
+          // di-mute akan benar-benar diam.
+          const perluNotifyNow = !silencedRef.current.delete(item.id);
+          const kategori = item.schedules?.kategori;
+
+          void (async () => {
+            await playReminderSound(kategori);
+
+            if (perluNotifyNow) {
+              await notifyNow({
+                title: item.judul || 'Pengingat jadwal',
+                body: item.pesan,
+                tag: item.id,
+              });
+            }
+          })();
+        });
     }
     setNotifLoading(false);
   }, [session]);
