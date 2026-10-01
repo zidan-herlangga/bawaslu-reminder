@@ -11,17 +11,33 @@ import {
   subscribeSound,
   subscribeSoundBusy,
 } from '../lib/sound';
-import { DIVISI_OPTIONS, JABATAN_OPTIONS, MIN_PASSWORD_LENGTH } from '../constants/options';
+import {
+  DIVISI_OPTIONS,
+  JABATAN_OPTIONS,
+  KATEGORI_OPTIONS,
+  MIN_PASSWORD_LENGTH,
+} from '../constants/options';
+
+// Warna chip dan titik per kategori, sama dengan yang dipakai di Dashboard dan
+// Kalender supaya pengguna langsung tahu kategori yang mana tanpa membaca.
+const KATEGORI_TONE = {
+  Rapat: { dot: 'bg-bw-blue', chip: 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue-700' },
+  Tugas: { dot: 'bg-bw-amber-500', chip: 'border-bw-amber-200 bg-bw-amber-50 text-bw-amber' },
+  Pengawasan: {
+    dot: 'bg-bw-green-500',
+    chip: 'border-bw-green-200 bg-bw-green-50 text-bw-green-700',
+  },
+};
 
 const ROW_CLASS = 'flex items-start justify-between gap-4 py-3';
 const LABEL_CLASS = 'text-[13px] text-bw-muted';
 const VALUE_CLASS = 'text-right text-[13px] font-semibold text-bw-ink break-words';
 
 const FIELD_CLASS =
-  'block w-full rounded-lg border border-bw-line bg-white px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25';
+  'block w-full rounded-xl border border-bw-line bg-bw-card px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25';
 const INPUT_LABEL = 'mb-1.5 block text-[12px] font-semibold text-bw-ink';
 const PRIMARY_BTN =
-  'w-full rounded-lg bg-bw-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none';
+  'w-full rounded-xl bg-bw-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none';
 
 const PROFILE_COLUMNS = 'nama_lengkap, divisi, jabatan, role_akses, status_akun';
 
@@ -207,7 +223,7 @@ export default function Akun() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-bw-line bg-white shadow-card">
+      <section className="overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-card">
         <div className="flex items-center gap-3.5 border-b border-bw-line bg-bw-blue-50 px-4 py-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-bw-blue text-lg font-bold text-white ring-4 ring-white">
             {initialsOf(nama)}
@@ -222,7 +238,7 @@ export default function Akun() {
           <button
             type="button"
             onClick={toggleEditProfile}
-            className="shrink-0 rounded-lg border border-bw-blue-200 bg-white px-3 py-2 text-xs font-bold text-bw-blue transition-colors hover:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+            className="shrink-0 rounded-xl border border-bw-blue-200 bg-bw-card px-3 py-2 text-xs font-bold text-bw-blue transition-colors hover:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
           >
             {editOpen ? 'Batal' : 'Ubah'}
           </button>
@@ -330,7 +346,7 @@ export default function Akun() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
         <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Pengaturan Pengingat
         </h2>
@@ -341,7 +357,7 @@ export default function Akun() {
           disabled={soundBusy}
           role="switch"
           aria-checked={soundOn}
-          className="mt-3 flex w-full items-center justify-between gap-4 rounded-lg border border-bw-line bg-bw-surface px-3.5 py-3 text-left transition-colors hover:border-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 flex w-full items-center justify-between gap-4 rounded-xl border border-bw-line bg-bw-surface px-3.5 py-3 text-left transition-colors hover:border-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span>
             <span className="block text-[13px] font-semibold text-bw-ink">
@@ -357,15 +373,45 @@ export default function Akun() {
             }`}
           >
             <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-bw-card shadow transition-all ${
                 soundOn ? 'left-[22px]' : 'left-0.5'
               }`}
             />
           </span>
         </button>
 
+        {soundOn && (
+          <div className="mt-3 rounded-xl border border-bw-line bg-bw-surface px-3.5 py-3">
+            <p className="text-xs leading-relaxed text-bw-muted">
+              Tiap kategori punya nada sendiri. Dengarkan sekali di sini untuk memastikan
+              benar-benar berbeda.
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {KATEGORI_OPTIONS.map((kategori) => (
+                <button
+                  key={kategori}
+                  type="button"
+                  onClick={() => playChime(kategori)}
+                  disabled={soundBusy}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    KATEGORI_TONE[kategori]?.chip ??
+                    'border-bw-line bg-bw-card text-bw-muted hover:border-bw-blue-200'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${
+                      KATEGORI_TONE[kategori]?.dot ?? 'bg-bw-muted'
+                    }`}
+                  />
+                  {kategori}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {reminder.supported && reminder.permission !== 'granted' && (
-          <div className="mt-3 rounded-lg border border-bw-blue-200 bg-bw-blue-50 px-3.5 py-3">
+          <div className="mt-3 rounded-xl border border-bw-blue-200 bg-bw-blue-50 px-3.5 py-3">
             <p className="text-xs leading-relaxed text-bw-blue-900">
               Aktifkan izin browser agar notifikasi muncul walau tab tidak sedang
               dibuka. Pengingat {reminder.leadMinutes} menit sebelum jadwal dimulai.
@@ -374,7 +420,7 @@ export default function Akun() {
               type="button"
               onClick={reminder.requestPermission}
               disabled={reminder.permission === 'denied'}
-              className="mt-2 rounded-lg bg-bw-blue px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted"
+              className="mt-2 rounded-xl bg-bw-blue px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted"
             >
               {reminder.permission === 'denied'
                 ? 'Diblokir browser'
@@ -384,7 +430,7 @@ export default function Akun() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
         <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
           Keamanan Akun
         </h2>
@@ -430,7 +476,7 @@ export default function Akun() {
           {pwMsg && (
             <p
               role={pwMsg.type === 'error' ? 'alert' : 'status'}
-              className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
+              className={`rounded-xl px-3 py-2 text-xs leading-relaxed ${
                 pwMsg.type === 'error'
                   ? 'bg-bw-red-50 text-bw-red'
                   : 'bg-bw-blue-50 text-bw-blue-900'
@@ -449,7 +495,7 @@ export default function Akun() {
       <button
         type="button"
         onClick={signOut}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-bw-red-100 bg-white px-4 py-3 text-sm font-semibold text-bw-red transition-colors hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+        className="flex w-full items-center justify-center gap-2 rounded-3xl border border-bw-red-100 bg-bw-card px-4 py-3 text-sm font-semibold text-bw-red transition-colors hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
       >
         Keluar dari akun
       </button>
