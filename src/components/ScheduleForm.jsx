@@ -23,7 +23,7 @@ const TARGET_MODES = [
 ];
 
 const FIELD_BASE_CLASS =
-  'block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-bw-surface';
+  'block w-full rounded-xl border bg-bw-card px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-bw-surface';
 const FIELD_OK_CLASS = 'border-bw-line focus:border-bw-blue focus:ring-bw-blue/25';
 const FIELD_INVALID_CLASS = 'border-bw-red focus:ring-bw-red/25';
 
@@ -345,13 +345,13 @@ export default function ScheduleForm() {
       <div className="mx-auto w-full max-w-sm space-y-3">
         <div
           role="alert"
-          className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+          className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
         >
           {detailError}
         </div>
         <Link
           to="/"
-          className="flex items-center justify-center rounded-lg border border-bw-line bg-white px-4 py-3 text-sm font-semibold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue"
+          className="flex items-center justify-center rounded-xl border border-bw-line bg-bw-card px-4 py-3 text-sm font-semibold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue"
         >
           Kembali ke beranda
         </Link>
@@ -361,7 +361,7 @@ export default function ScheduleForm() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
+      <div className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
         <div className="border-b border-bw-line pb-4">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
             {isEdit ? 'Ubah Jadwal' : 'Jadwal Baru'}
@@ -379,7 +379,7 @@ export default function ScheduleForm() {
           {formError && (
             <div
               role="alert"
-              className="rounded-lg border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
+              className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
             >
               {formError}
             </div>
@@ -430,10 +430,10 @@ export default function ScheduleForm() {
               {TARGET_MODES.map((mode) => (
                 <label
                   key={mode.value}
-                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors focus-within:ring-2 focus-within:ring-bw-blue/40 ${
+                  className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors focus-within:ring-2 focus-within:ring-bw-blue/40 ${
                     form.target_mode === mode.value
                       ? 'border-bw-blue bg-bw-blue-50'
-                      : 'border-bw-line bg-white hover:border-bw-blue-200'
+                      : 'border-bw-line bg-bw-card hover:border-bw-blue-200'
                   }`}
                 >
                   <input
@@ -496,7 +496,7 @@ export default function ScheduleForm() {
               {form.slots.map((slot, index) => (
                 <div
                   key={index}
-                  className="rounded-2xl border border-bw-line bg-bw-surface p-3"
+                  className="rounded-xl border border-bw-line bg-bw-surface p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wide text-bw-muted">
@@ -583,7 +583,7 @@ export default function ScheduleForm() {
             <button
               type="button"
               onClick={addSlot}
-              className="mt-3 w-full rounded-lg border border-dashed border-bw-blue-200 bg-bw-blue-50 px-4 py-2.5 text-xs font-bold text-bw-blue transition-colors hover:border-bw-blue hover:bg-bw-blue-100 focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+              className="mt-3 w-full rounded-xl border border-dashed border-bw-blue-200 bg-bw-blue-50 px-4 py-2.5 text-xs font-bold text-bw-blue transition-colors hover:border-bw-blue hover:bg-bw-blue-100 focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
             >
               + Tambah tanggal &amp; jam
             </button>
@@ -613,13 +613,13 @@ export default function ScheduleForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-bw-blue px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-1 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-bw-blue px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-bw-card active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none"
             >
               {isSubmitting ? 'Menyimpan...' : isEdit ? 'Simpan Perubahan' : 'Simpan Jadwal'}
             </button>
             <Link
               to="/"
-              className="flex items-center justify-center rounded-lg border border-bw-line bg-white px-4 py-3 text-sm font-semibold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+              className="flex items-center justify-center rounded-xl border border-bw-line bg-bw-card px-4 py-3 text-sm font-semibold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
             >
               Batal
             </Link>

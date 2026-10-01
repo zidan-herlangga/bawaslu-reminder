@@ -10,11 +10,11 @@ const TABS = [
 ];
 
 const FIELD_CLASS =
-  'block w-full rounded-lg border border-bw-line bg-white px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25';
+  'block w-full rounded-xl border border-bw-line bg-bw-card px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25';
 
 const TAB_ACTIVE =
-  'rounded-md bg-white px-2 py-1.5 text-[12px] font-bold text-bw-blue shadow-sm ring-1 ring-bw-line';
-const TAB_IDLE = 'rounded-md px-2 py-1.5 text-[12px] font-bold text-bw-muted hover:text-bw-ink';
+  'rounded-lg bg-bw-card px-2 py-1.5 text-[12px] font-bold text-bw-blue shadow-sm ring-1 ring-bw-line';
+const TAB_IDLE = 'rounded-lg px-2 py-1.5 text-[12px] font-bold text-bw-muted hover:text-bw-ink';
 
 function ymd(date) {
   const year = date.getFullYear();
@@ -230,7 +230,7 @@ export default function TodoPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
         <div className="flex items-start justify-between gap-3 border-b border-bw-line pb-3">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
@@ -260,7 +260,7 @@ export default function TodoPage() {
           <p className="mt-1.5 text-xs text-bw-muted">{formatTanggalPanjang(tanggal)}</p>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-bw-surface p-1">
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-bw-surface p-1">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -290,7 +290,7 @@ export default function TodoPage() {
           <button
             type="submit"
             disabled={saving || !draft.trim()}
-            className="shrink-0 rounded-lg bg-bw-blue px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none"
+            className="shrink-0 rounded-xl bg-bw-blue px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line disabled:shadow-none"
           >
             {saving ? 'Menyimpan...' : 'Tambah'}
           </button>
@@ -299,7 +299,7 @@ export default function TodoPage() {
         {listError && (
           <p
             role="alert"
-            className="mt-3 rounded-lg border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
+            className="mt-3 rounded-xl border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
           >
             {listError}
           </p>
@@ -321,7 +321,7 @@ export default function TodoPage() {
         )}
 
         {!listLoading && visible.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
+          <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-8 text-center">
             <p className="text-sm font-semibold text-bw-ink">Belum ada todo</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               {tab === 'tanggal'
@@ -339,7 +339,7 @@ export default function TodoPage() {
               return (
                 <li
                   key={todo.id}
-                  className="flex items-start gap-3 rounded-2xl border border-bw-line bg-white p-3.5 shadow-card"
+                  className="flex items-start gap-3 rounded-3xl border border-bw-line bg-bw-card p-3.5 shadow-card"
                 >
                   <input
                     id={`todo-${todo.id}`}
@@ -364,19 +364,19 @@ export default function TodoPage() {
                         }}
                         maxLength={300}
                         autoFocus
-                        className="block w-full rounded-lg border border-bw-blue bg-white px-2.5 py-1.5 text-sm text-bw-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-bw-blue/30"
+                        className="block w-full rounded-xl border border-bw-blue bg-bw-card px-2.5 py-1.5 text-sm text-bw-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-bw-blue/30"
                       />
                       <div className="mt-1.5 flex gap-1.5">
                         <button
                           type="submit"
-                          className="rounded-lg bg-bw-blue px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          className="rounded-xl bg-bw-blue px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                         >
                           Simpan
                         </button>
                         <button
                           type="button"
                           onClick={cancelEdit}
-                          className="rounded-lg border border-bw-line bg-white px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          className="rounded-xl border border-bw-line bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                         >
                           Batal
                         </button>
@@ -406,7 +406,7 @@ export default function TodoPage() {
                         type="button"
                         onClick={() => startEdit(todo)}
                         aria-label={`Ubah todo ${todo.teks}`}
-                        className="grid h-7 w-7 place-items-center rounded-lg text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                        className="grid h-7 w-7 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                       >
                         <svg
                           className="h-3.5 w-3.5"
@@ -421,7 +421,7 @@ export default function TodoPage() {
                         type="button"
                         onClick={() => removeTodo(todo)}
                         aria-label={`Hapus todo ${todo.teks}`}
-                        className="grid h-7 w-7 place-items-center rounded-lg text-bw-muted transition-colors hover:bg-bw-red-50 hover:text-bw-red focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                        className="grid h-7 w-7 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-red-50 hover:text-bw-red focus:outline-none focus:ring-2 focus:ring-bw-red/40"
                       >
                         <svg
                           className="h-3.5 w-3.5"

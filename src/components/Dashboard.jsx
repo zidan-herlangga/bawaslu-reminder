@@ -17,15 +17,15 @@ const TICK_MS = 30 * 1000;
 
 const KATEGORI_STYLE = {
   Rapat: 'bg-bw-blue-50 text-bw-blue-700 ring-bw-blue-200',
-  Tugas: 'bg-amber-50 text-amber-700 ring-amber-200',
-  Pengawasan: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  Tugas: 'bg-bw-amber-50 text-bw-amber ring-bw-amber-200',
+  Pengawasan: 'bg-bw-green-50 text-bw-green-700 ring-bw-green-200',
   Lainnya: 'bg-bw-surface text-bw-muted ring-bw-line',
 };
 
 const KATEGORI_ACCENT = {
   Rapat: 'bg-bw-blue',
-  Tugas: 'bg-amber-500',
-  Pengawasan: 'bg-emerald-500',
+  Tugas: 'bg-bw-amber-500',
+  Pengawasan: 'bg-bw-green-500',
   Lainnya: 'bg-bw-line',
 };
 
@@ -188,7 +188,7 @@ export default function Dashboard() {
       <ClockWidget />
 
       {nextItem && (
-        <section className="relative overflow-hidden rounded-2xl border border-bw-blue-200 bg-gradient-to-br from-white via-white to-bw-blue-50 p-5 shadow-card ring-1 ring-bw-blue-100/70 sm:p-6">
+        <section className="relative overflow-hidden rounded-3xl border border-bw-blue-200 bg-gradient-to-br from-white via-white to-bw-blue-50 p-5 shadow-card ring-1 ring-bw-blue-100/70 sm:p-6">
           <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-bw-blue" />
 
           <div className="flex items-start justify-between gap-4">
@@ -217,7 +217,7 @@ export default function Dashboard() {
                 >
                   {nextItem.schedule.kategori}
                 </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
+                <span className="rounded-full bg-bw-card px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
                   {nextItem.schedule.target_divisi
                     ? `Khusus ${
                         DIVISI_SHORT[nextItem.schedule.target_divisi] ??
@@ -240,7 +240,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-bw-muted">
           {sapaan}
         </p>
@@ -258,7 +258,7 @@ export default function Dashboard() {
           </span>
           <Link
             to="/jadwal/baru"
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-bw-blue px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98]"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-bw-blue px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98]"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
@@ -269,7 +269,7 @@ export default function Dashboard() {
       </section>
 
       {reminder.supported && reminder.permission !== 'granted' && (
-        <div className="flex items-start gap-3 rounded-2xl border border-bw-blue-200 bg-bw-blue-50 px-4 py-3">
+        <div className="flex items-start gap-3 rounded-3xl border border-bw-blue-200 bg-bw-blue-50 px-4 py-3">
           <p className="flex-1 text-xs leading-relaxed text-bw-blue-900">
             Aktifkan notifikasi agar pengingat muncul {reminder.leadMinutes} menit
             sebelum jadwal dimulai.
@@ -278,7 +278,7 @@ export default function Dashboard() {
             type="button"
             onClick={reminder.requestPermission}
             disabled={reminder.permission === 'denied'}
-            className="shrink-0 rounded-lg bg-bw-blue px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted"
+            className="shrink-0 rounded-xl bg-bw-blue px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted"
           >
             {reminder.permission === 'denied' ? 'Diblokir' : 'Izinkan'}
           </button>
@@ -308,7 +308,7 @@ export default function Dashboard() {
                   className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 ${
                     active
                       ? 'border-bw-blue bg-bw-blue text-white shadow-sm'
-                      : 'border-bw-line bg-white text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
+                      : 'border-bw-line bg-bw-card text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
                   }`}
                 >
                   {option.label}
@@ -322,7 +322,7 @@ export default function Dashboard() {
       {listError && (
         <div
           role="alert"
-          className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+          className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
         >
           {listError}
         </div>
@@ -336,7 +336,7 @@ export default function Dashboard() {
         )}
 
         {!listLoading && schedules.length === 0 && !listError && (
-          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+          <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10 text-center md:col-span-2">
             <svg
               className="mx-auto mb-3 h-9 w-9 text-bw-blue-200"
               viewBox="0 0 24 24"
@@ -359,7 +359,7 @@ export default function Dashboard() {
         )}
 
         {!listLoading && schedules.length > 0 && visibleSchedules.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-10 text-center md:col-span-2">
+          <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10 text-center md:col-span-2">
             <svg
               className="mx-auto mb-3 h-9 w-9 text-bw-blue-200"
               viewBox="0 0 24 24"
@@ -402,7 +402,7 @@ export default function Dashboard() {
             return (
               <article
                 key={schedule.id}
-                className={`group relative overflow-hidden rounded-2xl border border-bw-line bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift ${
+                className={`group relative overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift ${
                   sudahLewat ? 'opacity-70' : ''
                 }`}
               >
@@ -474,7 +474,7 @@ export default function Dashboard() {
                     {remind.id === schedule.id && remind.message && (
                       <p
                         role="status"
-                        className={`mt-2 rounded-lg px-2.5 py-1.5 text-xs leading-relaxed ${
+                        className={`mt-2 rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
                           remind.status === 'error'
                             ? 'bg-bw-red-50 text-bw-red'
                             : 'bg-bw-blue-50 text-bw-blue-900'
@@ -502,7 +502,7 @@ export default function Dashboard() {
                             soundBusy ||
                             (remind.id === schedule.id && remind.status === 'busy')
                           }
-                          className="rounded-lg bg-bw-blue px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
+                          className="rounded-xl bg-bw-blue px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
                         >
                           {remind.id === schedule.id && remind.status === 'busy'
                             ? 'Mengirim...'
@@ -511,7 +511,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-1.5 text-xs font-semibold">
                           <Link
                             to={`/jadwal/${schedule.id}/edit`}
-                            className="text-bw-muted transition-colors hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40 rounded-sm"
+                            className="text-bw-muted transition-colors hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40 rounded-lg"
                           >
                             Edit
                           </Link>
@@ -538,7 +538,7 @@ export default function Dashboard() {
                               showToast('Jadwal dihapus.', 'success');
                               loadSchedules();
                             }}
-                            className="rounded-sm text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                            className="rounded-lg text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
                           >
                             Hapus
                           </button>

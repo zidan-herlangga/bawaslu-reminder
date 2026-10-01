@@ -24,15 +24,15 @@ const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 const KATEGORI_STYLE = {
   Rapat: 'bg-bw-blue-50 text-bw-blue-700 ring-bw-blue-200',
-  Tugas: 'bg-amber-50 text-amber-700 ring-amber-200',
-  Pengawasan: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  Tugas: 'bg-bw-amber-50 text-bw-amber ring-bw-amber-200',
+  Pengawasan: 'bg-bw-green-50 text-bw-green-700 ring-bw-green-200',
   Lainnya: 'bg-bw-surface text-bw-muted ring-bw-line',
 };
 
 const KATEGORI_ACCENT = {
   Rapat: 'bg-bw-blue',
-  Tugas: 'bg-amber-500',
-  Pengawasan: 'bg-emerald-500',
+  Tugas: 'bg-bw-amber-500',
+  Pengawasan: 'bg-bw-green-500',
   Lainnya: 'bg-bw-line',
 };
 
@@ -115,7 +115,7 @@ function ChevronButton({ direction, onClick, label }) {
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-bw-line bg-white text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-bw-line bg-bw-card text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
     >
       <svg
         className={`h-4 w-4 ${direction === 'right' ? 'rotate-180' : ''}`}
@@ -258,6 +258,19 @@ export default function Kalender() {
 
   const cells = useMemo(() => buildMonthGrid(view), [view]);
 
+  const liburBulan = useMemo(() => {
+    const tahun = view.getFullYear();
+    const jumlahHari = new Date(tahun, view.getMonth() + 1, 0).getDate();
+    const hasil = [];
+
+    for (let hari = 1; hari <= jumlahHari; hari += 1) {
+      const libur = getHariLibur(ymd(new Date(tahun, view.getMonth(), hari)));
+      if (libur) hasil.push({ hari, ...libur });
+    }
+
+    return hasil;
+  }, [view]);
+
   const selectedDate = useMemo(() => {
     const [year, month, day] = selected.split('-').map(Number);
     return new Date(year, month - 1, day);
@@ -372,7 +385,7 @@ export default function Kalender() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-bw-line bg-white p-4 shadow-card">
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
         <div className="flex items-center justify-between gap-2">
           <ChevronButton direction="left" onClick={() => goMonth(-1)} label="Bulan sebelumnya" />
 
@@ -436,7 +449,7 @@ export default function Kalender() {
                 onClick={() => setSelected(key)}
                 aria-pressed={isSelected}
                 aria-label={keterangan.join(', ')}
-                className={`relative flex aspect-square flex-col items-center justify-center rounded-lg border text-[13px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 ${tone}`}
+                className={`relative flex aspect-square flex-col items-center justify-center rounded-xl border text-[13px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 ${tone}`}
               >
                 {cell.getDate()}
                 <span
@@ -444,7 +457,7 @@ export default function Kalender() {
                     count === 0
                       ? 'bg-transparent'
                       : isToday
-                        ? 'bg-white'
+                        ? 'bg-bw-card'
                         : 'bg-bw-red'
                   }`}
                 />
@@ -453,26 +466,49 @@ export default function Kalender() {
           })}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-bw-line pt-3 text-[11px] text-bw-muted">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-bw-red" />
-            Ada jadwal
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-bw-blue" />
-            Hari ini
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="text-bw-red">31</span>
-            Tanggal merah
-          </span>
-          <button
-            type="button"
-            onClick={goToday}
-            className="ml-auto font-bold text-bw-blue transition-colors hover:text-bw-blue-hi hover:underline"
-          >
-            Hari ini
-          </button>
+        <div className="mt-3 border-t border-bw-line pt-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-bw-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-bw-red" />
+              Ada jadwal
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-bw-blue" />
+              Hari ini
+            </span>
+            <button
+              type="button"
+              onClick={goToday}
+              className="ml-auto font-bold text-bw-blue transition-colors hover:text-bw-blue-hi hover:underline"
+            >
+              Hari ini
+            </button>
+          </div>
+
+          {liburBulan.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {liburBulan.map((item) => (
+                <li key={`${item.hari}-${item.nama}`} className="flex items-start gap-2 text-[11px]">
+                  <span
+                    className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold leading-none ${
+                      item.jenis === 'cuti'
+                        ? 'bg-bw-blue-50 text-bw-blue-700'
+                        : 'bg-bw-red-50 text-bw-red'
+                    }`}
+                  >
+                    {item.hari}
+                  </span>
+                  <span className="min-w-0 flex-1 text-bw-muted">
+                    <span className="font-semibold text-bw-ink">{item.nama}</span>
+                    <span className="text-bw-muted">
+                      {' '}
+                      - {labelJenis(item.jenis)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 
@@ -497,7 +533,7 @@ export default function Kalender() {
               onChange={(event) => setCari(event.target.value)}
               placeholder="Cari judul, keterangan, atau pembuat"
               aria-label="Cari jadwal"
-              className="w-full rounded-xl border border-bw-line bg-white py-2.5 pl-9 pr-9 text-sm text-bw-ink outline-none transition-colors placeholder:text-bw-muted/80 focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
+              className="w-full rounded-xl border border-bw-line bg-bw-card py-2.5 pl-9 pr-9 text-sm text-bw-ink outline-none transition-colors placeholder:text-bw-muted focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
             />
             {cari && (
               <button
@@ -525,7 +561,7 @@ export default function Kalender() {
             value={filterDivisi}
             onChange={(event) => setFilterDivisi(event.target.value)}
             aria-label="Filter divisi pembuat"
-            className="h-[42px] shrink-0 rounded-xl border border-bw-line bg-white px-2.5 text-xs font-semibold text-bw-ink outline-none transition-colors focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
+            className="h-[42px] shrink-0 rounded-xl border border-bw-line bg-bw-card px-2.5 text-xs font-semibold text-bw-ink outline-none transition-colors focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
           >
             {DIVISI_FILTER_OPTIONS.map((option) => (
               <option key={option.value || 'semua'} value={option.value}>
@@ -548,7 +584,7 @@ export default function Kalender() {
                   className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 ${
                     active
                       ? 'border-bw-blue bg-bw-blue text-white shadow-sm'
-                      : 'border-bw-line bg-white text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
+                      : 'border-bw-line bg-bw-card text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
                   }`}
                 >
                   {option.label}
@@ -565,7 +601,7 @@ export default function Kalender() {
               className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-bw-blue/40 ${
                 hanyaMilikSaya
                   ? 'border-bw-blue bg-bw-blue text-white shadow-sm'
-                  : 'border-bw-line bg-white text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
+                  : 'border-bw-line bg-bw-card text-bw-muted hover:border-bw-blue-200 hover:text-bw-blue'
               }`}
             >
               Jadwal saya
@@ -599,9 +635,9 @@ export default function Kalender() {
         {liburSelected && (
           <div
             role="status"
-            className={`mb-3 flex items-start gap-2 rounded-2xl border px-4 py-3 text-xs leading-relaxed ${
+            className={`mb-3 flex items-start gap-2 rounded-3xl border px-4 py-3 text-xs leading-relaxed ${
               liburSelected.jenis === 'cuti'
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-bw-amber-200 bg-bw-amber-50 text-bw-amber-800'
                 : 'border-bw-red-100 bg-bw-red-50 text-bw-red'
             }`}
           >
@@ -628,7 +664,7 @@ export default function Kalender() {
         {listError && (
           <div
             role="alert"
-            className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+            className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
           >
             {listError}
           </div>
@@ -639,7 +675,7 @@ export default function Kalender() {
         )}
 
         {!listLoading && !listError && rowsToRender.length === 0 && modeCari && (
-          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
+          <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-8 text-center">
             <p className="text-sm font-semibold text-bw-ink">Tidak ada hasil</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Tidak ada jadwal yang cocok dengan pencarian atau filter aktif.
@@ -655,7 +691,7 @@ export default function Kalender() {
         )}
 
         {!listLoading && !listError && rowsToRender.length === 0 && !modeCari && (
-          <div className="rounded-2xl border border-dashed border-bw-line bg-white px-5 py-8 text-center">
+          <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-8 text-center">
             <p className="text-sm font-semibold text-bw-ink">
               {selectedItems.length === 0 ? 'Tidak ada jadwal' : 'Tidak ada yang cocok'}
             </p>
@@ -701,14 +737,14 @@ export default function Kalender() {
               return (
                 <li
                   key={`${item.id}-${slot.mulai}`}
-                  className={`relative overflow-hidden rounded-2xl border border-bw-line bg-white p-3.5 pl-5 shadow-card transition-all duration-200 hover:shadow-lift ${
+                  className={`relative overflow-hidden rounded-3xl border border-bw-line bg-bw-card p-3.5 pl-5 shadow-card transition-all duration-200 hover:shadow-lift ${
                     sudahLewat ? 'opacity-70' : ''
                   }`}
                 >
                   <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${accent}`} />
 
                   <div className="flex items-start gap-3">
-                    <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-bw-blue-50 py-1.5">
+                    <div className="flex w-12 shrink-0 flex-col items-center rounded-xl bg-bw-blue-50 py-1.5">
                       <span className="font-display text-[13px] font-bold leading-none text-bw-blue-700">
                         {formatJam(slot.mulai)}
                       </span>
@@ -864,7 +900,7 @@ export default function Kalender() {
                       {reminded && remind.message && (
                         <p
                           role="status"
-                          className={`mt-2 rounded-lg px-2.5 py-1.5 text-xs leading-relaxed ${
+                          className={`mt-2 rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
                             remind.status === 'error'
                               ? 'bg-bw-red-50 text-bw-red'
                               : 'bg-bw-blue-50 text-bw-blue-900'
@@ -882,7 +918,7 @@ export default function Kalender() {
                         type="button"
                         onClick={() => handleRemind(item)}
                         disabled={soundBusy || sending}
-                        className="rounded-lg bg-bw-blue px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
+                        className="rounded-xl bg-bw-blue px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
                       >
                         {sending ? 'Mengirim...' : 'Ingatkan'}
                       </button>
@@ -909,7 +945,7 @@ export default function Kalender() {
                       type="button"
                       onClick={() => toggleDetail(item.id)}
                       aria-expanded={isOpen}
-                      className="rounded-lg border border-bw-line bg-white px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                      className="rounded-xl border border-bw-line bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                     >
                       {isOpen ? 'Sembunyikan' : 'Detail'}
                     </button>
@@ -918,14 +954,14 @@ export default function Kalender() {
                       <>
                         <Link
                           to={`/jadwal/${item.id}/edit`}
-                          className="rounded-lg border border-bw-line bg-white px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          className="rounded-xl border border-bw-line bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
                         >
                           Edit
                         </Link>
                         <button
                           type="button"
                           onClick={() => handleDelete(item)}
-                          className="rounded-lg border border-bw-red-100 bg-white px-3 py-1.5 text-xs font-bold text-bw-red transition-colors hover:border-bw-red hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                          className="rounded-xl border border-bw-red-100 bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-red transition-colors hover:border-bw-red hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
                         >
                           Hapus
                         </button>

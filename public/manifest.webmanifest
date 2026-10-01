@@ -9,8 +9,8 @@
   "id": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f2f2f2",
-  "theme_color": "#1e1e1e",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
   "icons": [
     {
       "src": "/favicon-32x32.png",

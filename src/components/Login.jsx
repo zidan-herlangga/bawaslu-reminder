@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const INPUT_CLASS =
-  'block w-full rounded-lg border border-bw-line bg-white px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25 disabled:bg-bw-surface';
+  'block w-full rounded-xl border border-bw-line bg-bw-card px-3.5 py-2.5 text-sm text-bw-ink shadow-sm transition-colors placeholder:text-bw-muted/70 focus:border-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/25 disabled:bg-bw-surface';
 
 const LABEL_CLASS = 'mb-1.5 block text-[13px] font-semibold text-bw-ink';
 
@@ -70,7 +70,7 @@ export default function Login() {
   return (
     <div className="flex min-h-full items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="rounded-2xl border border-bw-line bg-white p-5 shadow-card">
+        <div className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
           <div className="border-b border-bw-line pb-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Masuk
@@ -87,7 +87,7 @@ export default function Login() {
             {successMessage && !error && (
               <div
                 role="status"
-                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs leading-relaxed text-emerald-700"
+                className="rounded-xl border border-bw-green-200 bg-bw-green-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-green-700"
               >
                 {successMessage}
               </div>
@@ -96,7 +96,7 @@ export default function Login() {
             {error && (
               <div
                 role="alert"
-                className="rounded-lg border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
+                className="rounded-xl border border-bw-red-100 bg-bw-red-50 px-3.5 py-2.5 text-xs leading-relaxed text-bw-red"
               >
                 {error}
               </div>
@@ -145,7 +145,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex w-full items-center justify-center rounded-lg bg-bw-blue px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-1 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line"
+              className="flex w-full items-center justify-center rounded-xl bg-bw-blue px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-bw-canvas active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-bw-line"
             >
               {isSubmitting ? 'Memproses...' : 'Masuk'}
             </button>
