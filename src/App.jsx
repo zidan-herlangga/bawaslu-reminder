@@ -1,14 +1,20 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import Akun from './components/Akun';
 import AppShell from './components/AppShell';
-import Dashboard from './components/Dashboard';
-import Kalender from './components/Kalender';
-import LupaPassword from './components/LupaPassword';
-import Login from './components/Login';
-import Register from './components/Register';
-import ResetPassword from './components/ResetPassword';
-import ScheduleForm from './components/ScheduleForm';
-import TodoPage from './components/TodoPage';
+
+// AppShell tetap dimuat langsung: ia yang menyimpan navigasi, push, dan suara
+// pengingat, dan semua itu dibutuhkan begitu aplikasi dibuka. Halaman-halaman
+// di bawahnya hanya dimuat saat benar-benar dibuka, jadi bundel awal tidak lagi
+// membawa Kalender, ScheduleForm, dan halaman autentikasi sekaligus.
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Kalender = lazy(() => import('./components/Kalender'));
+const TodoPage = lazy(() => import('./components/TodoPage'));
+const ScheduleForm = lazy(() => import('./components/ScheduleForm'));
+const Akun = lazy(() => import('./components/Akun'));
+const Login = lazy(() => import('./components/Login'));
+const Register = lazy(() => import('./components/Register'));
+const ResetPassword = lazy(() => import('./components/ResetPassword'));
+const LupaPassword = lazy(() => import('./components/LupaPassword'));
 
 export default function App() {
   return (

@@ -73,5 +73,21 @@ export default defineConfig(({ mode }) => {
       open: true,
       allowedHosts: true, // Mengizinkan ngrok dan tunnel eksternal lainnya
     },
+    build: {
+      // Pustaka pihak ketiga dipisah dari kode aplikasi supaya perubahannya
+      // tidak membatalkan cache-nya. Tanpa ini, satu edit kecil di komponen
+      // membuat pengguna mengunduh ulang React dan Supabase.
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+              { name: 'vendor-router', test: /node_modules[\\/]react-router/ },
+              { name: 'vendor-supabase', test: /node_modules[\\/]@supabase/ },
+            ],
+          },
+        },
+      },
+    },
   };
 });
