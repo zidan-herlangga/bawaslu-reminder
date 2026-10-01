@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import fetchProfile from '../lib/fetchProfile';
 import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
+import useSchedules from '../hooks/useSchedules';
 import ClockWidget from './ClockWidget';
 import AddToCalendar from './AddToCalendar';
 import { notifyNow, sendRemind } from '../lib/push';
@@ -86,9 +87,8 @@ export default function Dashboard() {
   const { session, loading } = useSession();
 
   const [profile, setProfile] = useState(null);
-  const [schedules, setSchedules] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState('');
+  const { schedules, loading: listLoading, error: listError, reload: loadSchedules } =
+    useSchedules(session);
   const [divisiFilter, setDivisiFilter] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [remind, setRemind] = useState({ id: '', status: '', message: '' });
@@ -137,34 +137,11 @@ export default function Dashboard() {
     }
   };
 
-  const loadSchedules = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .order('waktu_mulai', { ascending: true });
-
-    if (error) {
-      console.error('[Dashboard] gagal memuat jadwal:', error.message);
-      setListError(
-        `Gagal memuat jadwal. Detail: ${error.message}. ` +
-          'Jalankan supabase/schema.sql di SQL Editor Supabase untuk membuat tabel beserta aturan RLS-nya.'
-      );
-      setSchedules([]);
-    } else {
-      setListError('');
-      setSchedules(data ?? []);
-    }
-
-    setListLoading(false);
-  }, []);
-
   useEffect(() => {
     if (!session) return;
 
-    setListLoading(true);
-    loadSchedules();
     fetchProfile(session).then(setProfile);
-  }, [session, loadSchedules]);
+  }, [session]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);

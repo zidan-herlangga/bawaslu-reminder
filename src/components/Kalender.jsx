@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
+import useSchedules from '../hooks/useSchedules';
 import AddToCalendar from './AddToCalendar';
 import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
 import { notifyNow, sendRemind } from '../lib/push';
@@ -135,9 +136,8 @@ function ChevronButton({ direction, onClick, label }) {
 export default function Kalender() {
   const { session, loading } = useSession();
 
-  const [schedules, setSchedules] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState('');
+  const { schedules, loading: listLoading, error: listError, reload: loadSchedules } =
+    useSchedules(session);
 
   const today = useMemo(() => new Date(), []);
   const [view, setView] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -157,34 +157,6 @@ export default function Kalender() {
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(timer);
   }, []);
-
-  const loadSchedules = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .order('waktu_mulai', { ascending: true });
-
-    if (error) {
-      console.error('[Kalender] gagal memuat jadwal:', error.message);
-      setListError(
-        `Gagal memuat jadwal. Detail: ${error.message}. ` +
-          'Jalankan supabase/schema.sql di SQL Editor Supabase untuk membuat tabel beserta aturan RLS-nya.'
-      );
-      setSchedules([]);
-    } else {
-      setListError('');
-      setSchedules(data ?? []);
-    }
-
-    setListLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!session) return;
-
-    setListLoading(true);
-    loadSchedules();
-  }, [session, loadSchedules]);
 
   const handleRemind = async (schedule) => {
     // api/notify.js menolak dengan 403 bila pengirim bukan pembuat jadwal,
