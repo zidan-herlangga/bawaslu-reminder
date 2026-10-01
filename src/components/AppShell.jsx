@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
+import ThemeToggle from './ThemeToggle';
 import useSession from '../hooks/useSession';
 import { supabase } from '../lib/supabase';
 import { enablePush, ensurePushSubscription, isPushReady, notifyNow } from '../lib/push';
 import {
+  hasSoundActivation,
   isSoundBusy,
   isSoundEnabled,
   playChime,
   playReminderSound,
   setSoundEnabled,
   subscribeSound,
+  subscribeSoundActivation,
   subscribeSoundBusy,
 } from '../lib/sound';
 import { showToast, subscribeToast } from '../lib/toast';
@@ -24,7 +27,7 @@ const NOTIF_POLL_SLOW_MS = 60 * 1000;
 
 const TOAST_TONE = {
   error: 'bg-bw-red text-white ring-bw-red-100',
-  success: 'bg-bw-ink text-white ring-black/10',
+  success: 'bg-bw-solid text-bw-solid-text ring-bw-line',
   info: 'bg-bw-blue text-white ring-bw-blue-200',
 };
 
@@ -149,10 +152,40 @@ function IconLogout({ className }) {
 }
 
 const ICON_BUTTON_CLASS =
-  'grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-bw-line bg-white text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40';
+  'relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-transparent bg-transparent text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40';
 
 const NAV_BASE =
   'flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors';
+
+// Placeholder saat halaman yang dimuat malas belum selesai diunduh.
+// Bentuknya mengikuti halaman asli (kartu lebar penuh) supaya tidak melompat
+// saat isinya muncul. Sengaja tanpa animasi: tidak ada yang perlu dikecualikan
+// untuk prefers-reduced-motion.
+function PageSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Memuat halaman...</span>
+      <div className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
+        <div className="h-3 w-24 rounded-lg bg-bw-surface" />
+        <div className="mt-3 h-5 w-2/3 rounded-lg bg-bw-surface" />
+        <div className="mt-4 h-3 w-1/2 rounded-lg bg-bw-surface" />
+      </div>
+      <div className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
+        <div className="space-y-3">
+          <div className="h-3.5 w-full rounded-lg bg-bw-surface" />
+          <div className="h-3.5 w-11/12 rounded-lg bg-bw-surface" />
+          <div className="h-3.5 w-9/12 rounded-lg bg-bw-surface" />
+        </div>
+      </div>
+      <div className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card sm:p-5">
+        <div className="space-y-3">
+          <div className="h-3.5 w-10/12 rounded-lg bg-bw-surface" />
+          <div className="h-3.5 w-full rounded-lg bg-bw-surface" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AppShell() {
   const location = useLocation();
@@ -160,6 +193,7 @@ export default function AppShell() {
 
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
+  const [soundAktif, setSoundAktif] = useState(() => hasSoundActivation());
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -311,6 +345,14 @@ export default function AppShell() {
 
   useEffect(() => subscribeToast((item) => setToast(item)), []);
 
+  useEffect(
+    () =>
+      subscribeSoundActivation((aktif) => {
+        setSoundAktif(aktif);
+      }),
+    []
+  );
+
   useEffect(() => {
     if (!toast) return undefined;
     const timer = setTimeout(() => setToast(null), 5000);
@@ -382,15 +424,15 @@ export default function AppShell() {
   const navItems = [
     { to: '/', label: 'Beranda', icon: IconHome, end: true },
     { to: '/kalender', label: 'Kalender', icon: IconCalendar, end: false },
-    { to: '/todo', label: 'Todo', icon: IconChecklist, end: false },
     { to: '/jadwal/baru', label: 'Buat Jadwal', short: 'Buat', icon: IconPlus, end: false },
+    { to: '/todo', label: 'Todo', icon: IconChecklist, end: false },
     { to: '/akun', label: 'Akun', icon: IconUser, end: false },
   ];
 
   return (
     <div className="flex min-h-dvh justify-center bg-bw-canvas">
-      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white shadow-[0_0_50px_rgba(0,0,0,0.18)] ring-1 ring-black/5 sm:max-w-[560px] md:max-w-[760px] lg:max-w-[860px]">
-        <div className="bw-marquee shrink-0 overflow-hidden bg-bw-ink py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/55">
+      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-bw-card shadow-card ring-1 ring-bw-line sm:max-w-[560px] md:max-w-[760px] lg:max-w-[860px]">
+        <div className="bw-marquee shrink-0 overflow-hidden bg-bw-solid py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-bw-solid-muted">
           <span className="sr-only">
             Bawaslu Kota Bekasi - Sistem Pengingat Jadwal
           </span>
@@ -400,74 +442,100 @@ export default function AppShell() {
           </div>
         </div>
 
-        <header className="relative z-10 flex shrink-0 justify-between items-center gap-3 border-b border-bw-line bg-white px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <img
-              src="/logo-bawaslu.png"
-              alt="Logo Bawaslu"
-              className="h-9 w-auto shrink-0 object-contain sm:h-10"
-              width={132}
-              height={44}
-            />
-          </div>
-          {session && (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !notifOpen;
-                  setNotifOpen(next);
-                  if (next) loadNotifications();
-                }}
-                aria-expanded={notifOpen}
-                aria-haspopup="dialog"
-                aria-label={
-                  unread > 0 ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'
-                }
-                title="Notifikasi"
-                className={`${ICON_BUTTON_CLASS} relative ${
-                  notifOpen ? 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue' : ''
-                }`}
-              >
-                <IconBell className="h-[18px] w-[18px]" />
-                {unread > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 min-w-[16px] rounded-full bg-bw-red px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-white">
-                    {unread > 9 ? '9+' : unread}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={toggleSound}
-                disabled={soundBusy}
-                aria-pressed={soundOn}
-                aria-label={soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'}
-                title={soundBusy ? 'Tunggu nada selesai' : soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'}
-                className={`${ICON_BUTTON_CLASS} ${soundOn ? 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
-              >
-                {soundOn ? (
-                  <IconVolumeOn className="h-[18px] w-[18px]" />
-                ) : (
-                  <IconVolumeOff className="h-[18px] w-[18px]" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={signOut}
-                aria-label="Keluar dari akun"
-                title="Keluar"
-                className={ICON_BUTTON_CLASS}
-              >
-                <IconLogout className="h-[18px] w-[18px]" />
-              </button>
+        <header className="safe-top bw-glass relative z-10 shrink-0 border-x-0 border-t-0 border-b border-bw-line/70 px-3 py-2.5 sm:px-5">
+          <div className="flex items-center gap-2.5 pt-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <img
+                src="/logo-mark.png"
+                alt=""
+                className="h-9 w-auto shrink-0 object-contain sm:h-10"
+                width={176}
+                height={192}
+              />
+              <div className="min-w-0">
+                <p className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-bw-ink">
+                  Pengingat Jadwal
+                </p>
+                <p className="truncate text-[11px] font-medium leading-tight text-bw-muted">
+                  Bawaslu Kota Bekasi
+                </p>
+              </div>
             </div>
-          )}
+            {/* Grup toolbar selalu dirender supaya tombol tema tetap ada di
+                halaman masuk. Tanpa sesi, grup ini hanya berisi tombol tema
+                dan tetap tampil sebagai pil satu tombol. */}
+            <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-bw-line bg-bw-card/60 p-0.5">
+              <ThemeToggle />
+              {session && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !notifOpen;
+                      setNotifOpen(next);
+                      if (next) loadNotifications();
+                    }}
+                    aria-expanded={notifOpen}
+                    aria-haspopup="dialog"
+                    aria-label={
+                      unread > 0 ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'
+                    }
+                    title="Notifikasi"
+                    className={`${ICON_BUTTON_CLASS} ${
+                      notifOpen ? 'bg-bw-blue-50 text-bw-blue' : ''
+                    }`}
+                  >
+                    <IconBell className="h-[18px] w-[18px]" />
+                    {unread > 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-bw-red px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-bw-card">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleSound}
+                    disabled={soundBusy}
+                    aria-pressed={soundOn}
+                    aria-label={
+                      soundOn ? 'Matikan suara pengingat' : 'Nyalakan suara pengingat'
+                    }
+                    title={
+                      soundBusy
+                        ? 'Tunggu nada selesai'
+                        : soundOn
+                          ? 'Matikan suara pengingat'
+                          : 'Nyalakan suara pengingat'
+                    }
+                    className={`${ICON_BUTTON_CLASS} ${
+                      soundOn ? 'bg-bw-blue-50 text-bw-blue' : ''
+                    } disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    {soundOn ? (
+                      <IconVolumeOn className="h-[18px] w-[18px]" />
+                    ) : (
+                      <IconVolumeOff className="h-[18px] w-[18px]" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    aria-label="Keluar dari akun"
+                    title="Keluar"
+                    className={ICON_BUTTON_CLASS}
+                  >
+                    <IconLogout className="h-[18px] w-[18px]" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
           {notifOpen && (
             <div
               role="dialog"
               aria-label="Notifikasi"
-              className="absolute right-3 top-full z-20 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-bw-line bg-white shadow-xl"
+              className="absolute right-3 top-full z-20 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-xl"
             >
               <div className="flex items-center justify-between gap-2 border-b border-bw-line bg-bw-surface px-3 py-2">
                 <p className="text-[12px] font-bold uppercase tracking-wide text-bw-muted">
@@ -496,7 +564,7 @@ export default function AppShell() {
 
               <div className="max-h-[55vh] overflow-y-auto overscroll-contain">
                 {notifError && (
-                  <p className="m-3 rounded-lg bg-bw-red-50 px-3 py-2 text-xs leading-relaxed text-bw-red">
+                  <p className="m-3 rounded-xl bg-bw-red-50 px-3 py-2 text-xs leading-relaxed text-bw-red">
                     {notifError}
                   </p>
                 )}
@@ -566,7 +634,7 @@ export default function AppShell() {
                       type="button"
                       onClick={handleEnablePush}
                       disabled={pushBusy}
-                      className="shrink-0 rounded-lg bg-bw-blue px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="shrink-0 rounded-xl bg-bw-blue px-2.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-bw-blue-200 focus:outline-none focus:ring-2 focus:ring-bw-blue/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {pushBusy ? 'Memproses...' : 'Aktifkan'}
                     </button>
@@ -579,24 +647,49 @@ export default function AppShell() {
 
         <main
           className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 sm:px-6 ${
-            showNav ? 'py-4' : 'py-6'
+            showNav ? 'pb-28 pt-4' : 'py-6'
           }`}
         >
+          {session && soundOn && !soundAktif && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-bw-blue-200 bg-bw-blue-50 px-3.5 py-3">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0 text-bw-blue"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                />
+              </svg>
+              <p className="min-w-0 flex-1 text-[13px] leading-snug text-bw-blue-900">
+                <span className="font-bold">Ketuk layar sekali</span> agar nada pengingat berbunyi.
+                Browser memblokir suara otomatis sampai kamu berinteraksi di halaman ini.
+              </p>
+            </div>
+          )}
+
           <ErrorBoundary key={location.pathname}>
-            <Outlet />
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
 
         {showNav && (
-          <nav className="safe-bottom shrink-0 border-t border-bw-line bg-white pt-1">
-            <ul className="mx-auto grid max-w-[560px] grid-cols-5">
+          <nav className="bw-glass safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-2 mb-0.5">
+            <ul className="pointer-events-auto mx-auto grid max-w-[520px] grid-cols-5 rounded-3xl border border-bw-line bg-bw-card/70 px-1 py-1 shadow-lift backdrop-blur-xl">
               {navItems.map(({ to, label, short, icon: Icon, end }) => (
                 <li key={to}>
                   <NavLink
                     to={to}
                     end={end}
                     className={({ isActive }) =>
-                      `${NAV_BASE} relative whitespace-nowrap ${
+                      `${NAV_BASE} relative whitespace-nowrap transition-transform active:scale-[0.94] ${
                         isActive ? 'text-bw-blue' : 'text-bw-muted hover:text-bw-ink'
                       }`
                     }
@@ -631,7 +724,7 @@ export default function AppShell() {
             className="pointer-events-none absolute inset-x-3 bottom-20 z-40 flex justify-center"
           >
             <p
-              className={`max-w-full rounded-2xl px-3.5 py-2.5 text-center text-xs font-semibold leading-snug shadow-lg ring-1 ${
+              className={`max-w-full rounded-3xl px-3.5 py-2.5 text-center text-xs font-semibold leading-snug shadow-lg ring-1 ${
                 TOAST_TONE[toast.tone] || TOAST_TONE.info
               }`}
             >

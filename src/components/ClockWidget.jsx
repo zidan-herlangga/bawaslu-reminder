@@ -20,12 +20,12 @@ export default function ClockWidget() {
   });
 
   return (
-    <section className="rounded-2xl border border-bw-blue-200 bg-gradient-to-br from-bw-blue to-bw-blue-hi p-4 text-white shadow-card">
+    <section className="rounded-3xl border border-bw-blue-200 bg-gradient-to-br from-bw-blue to-bw-blue-hi p-4 text-white shadow-card">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/75">
           Waktu Sekarang
         </p>
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+        <span className="rounded-full bg-bw-card/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
           WIB
         </span>
       </div>
