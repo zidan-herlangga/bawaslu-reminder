@@ -1,19 +1,40 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" data-tema="terang" data-tema-pilihan="sistem">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1e1e1e" />
+    <meta name="theme-color" content="#f2f2f7" />
+    <!-- Script ini harus jalan sebelum CSS digambar. Tanpa itu halaman
+         menampilkan tema terang selama beberapa frame ketika pengguna memilih
+         tema gelap, dan pilihan "Sistem" ikut terlambat. Script sengaja
+         inline supaya tidak menambah permintaan jaringan. -->
+    <script>
+      // Terapkan tema tersimpan sebelum CSS digambar supaya tidak ada
+      // kedipan warna keliru. Sengaja inline: menambah permintaan jaringan
+      // hanya untuk satu operasi kecil akan memperlambat render.
+      (function () {
+        var KEY = "bawaslu.tema";
+        var pilihan = "sistem";
+        try {
+          pilihan = window.localStorage.getItem(KEY) || "sistem";
+        } catch (e) {}
+        var gelap =
+          pilihan === "gelap" ||
+          (pilihan === "sistem" &&
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.setAttribute("data-tema", gelap ? "gelap" : "terang");
+        root.setAttribute("data-tema-pilihan", pilihan);
+      })();
+    </script>
     <meta
       name="description"
       content="Sistem pengingat jadwal internal Bawaslu Kota Bekasi."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Font memakai stack sistem (SF Pro di Apple, Roboto di Android) lewat
+         token --font-sans/--font-display. Font web tidak dimuat supaya tidak
+         ada permintaan pihak ketiga yang memblokir render. -->
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

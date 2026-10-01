@@ -1,35 +1,164 @@
 @import 'tailwindcss';
 
-@theme {
-  --font-sans: 'Arimo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  /* Font display untuk judul, angka, dan label bagian - memberi karakter
-     pada antarmuka supaya tidak terasa seperti dokumen Arial biasa. */
-  --font-display: 'Space Grotesk', 'Arimo', ui-sans-serif, system-ui, sans-serif;
+/* Token warna disatukan lewat CSS custom property supaya light dan dark mode
+   berganti tanpa menyentuh satu pun class di komponen. Tailwind v4 memakai
+   "inline" supaya utility seperti bg-bw-canvas menulis rujukan ke var(--bw-*),
+   bukan nilai hex yang sudah dibekukan saat build. */
+:root {
+  --bw-blue: #0071e3;
+  --bw-blue-hi: #0062c4;
+  --bw-blue-50: #eaf4fd;
+  --bw-blue-100: #d6e9fa;
+  --bw-blue-200: #aed3f3;
+  --bw-blue-700: #0058ac;
+  --bw-blue-900: #0a3f66;
 
-  --color-bw-blue: #037ac5;
-  --color-bw-blue-hi: #048ce2;
-  --color-bw-blue-50: #eaf6fd;
-  --color-bw-blue-100: #d3ecf9;
-  --color-bw-blue-200: #a8d9f3;
-  --color-bw-blue-700: #0363a0;
-  --color-bw-blue-900: #0a466a;
+  --bw-red: #d70015;
+  --bw-red-50: #fdecee;
+  --bw-red-100: #f9d8dd;
 
-  --color-bw-red: #c10841;
-  --color-bw-red-50: #fceef2;
-  --color-bw-red-100: #f8d8e0;
+  --bw-amber: #a85b00;
+  --bw-amber-50: #fdf3e6;
+  --bw-amber-200: #f4dcb8;
+  --bw-amber-500: #d98200;
+  --bw-amber-800: #8a4700;
+  --bw-amber-900: #6f3a00;
 
-  --color-bw-ink: #1e1e1e;
-  --color-bw-ink-2: #2b2b2b;
-  /* #6b6b6b (bukan #7f7f7f) supaya teks kecil tetap lulus WCAG AA:
-     5,3:1 di putih dan 4,8:1 di kanvas #f2f2f2. */
-  --color-bw-muted: #6b6b6b;
-  --color-bw-line: #e1e1e1;
-  --color-bw-surface: #f7f7f7;
-  --color-bw-canvas: #f2f2f2;
+  --bw-green: #046c4e;
+  --bw-green-50: #e6f5ef;
+  --bw-green-200: #b7dfd0;
+  --bw-green-500: #05855f;
+  --bw-green-700: #045f45;
 
-  /* Bayangan berlapis supaya kartu terangkat halus, bukan bayangan pipih template. */
-  --shadow-card: 0 1px 2px rgba(30, 30, 30, 0.04), 0 18px 36px -28px rgba(30, 30, 30, 0.45);
-  --shadow-lift: 0 2px 6px rgba(30, 30, 30, 0.05), 0 28px 56px -30px rgba(30, 30, 30, 0.5);
+  --bw-ink: #1c1c1e;
+  --bw-ink-2: #2c2c2e;
+  --bw-muted: #6b6b70;
+  --bw-line: #e1e1e4;
+  --bw-surface: #f4f4f6;
+  --bw-canvas: #f2f2f7;
+  /* Isian kartu. Dipakai menggantikan bg-white supaya mode gelap tidak
+     membuat layar menyala. */
+  --bw-card: #ffffff;
+
+  /* Permukaan pekat yang isinya teks terang (marquee, toast sukses).
+     Sengaja punya token sendiri: kalau memakai --bw-ink sebagai latar, warnanya
+     ikut terbalik saat tema gelap sehingga teks putih berakhir di atas
+     putih. Pasangan ini harus tetap gelap di kedua tema. */
+  --bw-solid: #1c1c1e;
+  --bw-solid-text: #f5f5f7;
+  --bw-solid-muted: rgba(245, 245, 247, 0.68);
+
+  /* Permukaan kaca: warna isian tetap mengikuti mode,gaussian blur layering. */
+  --bw-glass: rgba(255, 255, 255, 0.72);
+  --bw-glass-strong: rgba(255, 255, 255, 0.86);
+  --bw-glass-line: rgba(255, 255, 255, 0.6);
+  --bw-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -18px rgba(0, 0, 0, 0.28);
+
+  /* Bayangan: iOS "Elevated" diberi nama, bukan opacity buta. */
+  --bw-elevated: 0 2px 6px rgba(0, 0, 0, 0.05), 0 20px 44px -22px rgba(0, 0, 0, 0.3);
+}
+
+/* Nilai gelap berlaku lewat atribut data-tema, bukan media query. Alasannya:
+   pilihan "Sistem" diselesaikan oleh JavaScript menjadi terang atau gelap,
+   jadi blok token gelap hanya perlu satu salinan dan tidak pernah bisa meleset
+   antara media query dan pilihan eksplisit. */
+:root[data-tema='gelap'] {
+  --bw-blue: #0a84ff;
+    --bw-blue-hi: #409cff;
+    --bw-blue-50: #10243a;
+    --bw-blue-100: #16344f;
+    --bw-blue-200: #1d4a70;
+    --bw-blue-700: #6cb6ff;
+    --bw-blue-900: #cfe6ff;
+
+    --bw-red: #ff6961;
+    --bw-red-50: #35181a;
+    --bw-red-100: #4d2023;
+
+    --bw-amber: #ffb340;
+    --bw-amber-50: #33240f;
+    --bw-amber-200: #4d361a;
+    --bw-amber-500: #ff9f0a;
+    --bw-amber-800: #ffd08a;
+    --bw-amber-900: #ffe0b0;
+
+    --bw-green: #32d74b;
+    --bw-green-50: #0f2f1c;
+    --bw-green-200: #1c4a30;
+    --bw-green-500: #30d158;
+    --bw-green-700: #7ce495;
+
+    --bw-ink: #f5f5f7;
+  --bw-ink-2: #ebebef;
+  --bw-muted: #a1a1a8;
+  --bw-line: #38383d;
+  /* Urutan ketinggian harus mencerminkan mode terang: canvas < surface < card.
+     Kalau surface lebih terang dari card, panel seksi akan terlihat seperti
+     menumpuk keluar kartu, bukan tenantsang di dalamnya. */
+  --bw-surface: #121214;
+  --bw-canvas: #08080a;
+  --bw-card: #1c1c1e;
+
+  /* Di mode gelap surface pekat dibuat sedikit lebih terang dari kanvas supaya
+     tetap terlihat sebagai lapisan, tapi cukup gelap untuk teks terang. */
+  --bw-solid: #2c2c2e;
+  --bw-solid-text: #f5f5f7;
+  --bw-solid-muted: rgba(245, 245, 247, 0.72);
+
+  --bw-glass: rgba(28, 28, 30, 0.72);
+  --bw-glass-strong: rgba(28, 28, 30, 0.88);
+  --bw-glass-line: rgba(255, 255, 255, 0.14);
+  --bw-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -18px rgba(0, 0, 0, 0.8);
+
+  --bw-elevated: 0 2px 6px rgba(0, 0, 0, 0.6), 0 20px 44px -22px rgba(0, 0, 0, 0.85);
+}
+
+@theme inline {
+  /* -apple-system di depan supaya perangkat Apple memakai SF Pro asli,
+     bukan font web. Di Android/windows brib ke font sistem masing-masing. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI',
+    Roboto, system-ui, sans-serif;
+
+  --color-bw-blue: var(--bw-blue);
+  --color-bw-blue-hi: var(--bw-blue-hi);
+  --color-bw-blue-50: var(--bw-blue-50);
+  --color-bw-blue-100: var(--bw-blue-100);
+  --color-bw-blue-200: var(--bw-blue-200);
+  --color-bw-blue-700: var(--bw-blue-700);
+  --color-bw-blue-900: var(--bw-blue-900);
+
+  --color-bw-red: var(--bw-red);
+  --color-bw-red-50: var(--bw-red-50);
+  --color-bw-red-100: var(--bw-red-100);
+
+  --color-bw-amber: var(--bw-amber);
+  --color-bw-amber-50: var(--bw-amber-50);
+  --color-bw-amber-200: var(--bw-amber-200);
+  --color-bw-amber-500: var(--bw-amber-500);
+  --color-bw-amber-800: var(--bw-amber-800);
+  --color-bw-amber-900: var(--bw-amber-900);
+
+  --color-bw-green: var(--bw-green);
+  --color-bw-green-50: var(--bw-green-50);
+  --color-bw-green-200: var(--bw-green-200);
+  --color-bw-green-500: var(--bw-green-500);
+  --color-bw-green-700: var(--bw-green-700);
+
+  --color-bw-ink: var(--bw-ink);
+  --color-bw-ink-2: var(--bw-ink-2);
+  --color-bw-muted: var(--bw-muted);
+  --color-bw-line: var(--bw-line);
+  --color-bw-surface: var(--bw-surface);
+  --color-bw-canvas: var(--bw-canvas);
+  --color-bw-card: var(--bw-card);
+  --color-bw-solid: var(--bw-solid);
+  --color-bw-solid-text: var(--bw-solid-text);
+  --color-bw-solid-muted: var(--bw-solid-muted);
+
+  --shadow-card: var(--bw-glass-shadow);
+  --shadow-lift: var(--bw-elevated);
 }
 
 @layer base {
@@ -37,23 +166,103 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* Scrollbar, form control, dan elemen bawaan OS ikut tema yang benar-benar
+     dipakai, bukan sekadar media query, supaya pilihan "Terang" di perangkat
+     yang sistemnya gelap tetap menampilkan scrollbar terang. */
+  :root {
+    color-scheme: light;
+  }
+
+  :root[data-tema='gelap'] {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-bw-canvas text-bw-ink antialiased;
     font-family: var(--font-sans);
-    /* -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none; */
+/* iOS merender teks sistem sedikit lebih rapat. Penyesuaian tracking ini
+       menjaga judul tetap rapat tanpa mengorbankan keterbacaan. */
+    letter-spacing: -0.01em;
+    /* Transisi warna singkat supaya pergantian tema tidak terasa kasar. */
+    transition: background-color 200ms ease, color 200ms ease;
   }
 
   ::selection {
-    background: #037ac5;
+    background: var(--bw-blue);
     color: #ffffff;
+  }
+
+  /* Semua elemen fokus harus kelihatan jelas di mode gelap juga. */
+  :focus-visible {
+    outline: 2px solid var(--bw-blue);
+    outline-offset: 2px;
+  }
+
+  /* Ikon scrollbar understated ala iOS. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--bw-muted) 32%, transparent);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Umpan balik taktil ala iOS untuk semua tombol sekaligus.
+     Ditaruh di layer base supaya utility active:scale-* yang sudah ada di
+     komponen tetap menang, dan aturan ini hanya menutupi yang belum punya. */
+  button:not(:disabled) {
+    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):active {
+      transform: scale(0.97);
+    }
   }
 }
 
 @utility safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Radius iOS: kartu 20px (rounded-3xl), tombol dan input 12px (rounded-xl),
+   chip kecil 8px (rounded-lg). Nilai ini menggantikan skala lama 16/8/2 yang
+   terasa kotak untuk material iOS. Semua pemakaian di komponen mengikuti
+   aturan ini; jangan menambah nilai lain tanpa memperbarui semuanya. */
+
+/* Pendekatan ke material "Liquid Glass" Apple. Apple hanya mendokumentasikan
+   material ini untuk platformnya sendiri, jadi implementasi web di sini
+   adalah pendekatan, bukan materi resmi. */
+@utility bw-glass {
+  background-color: var(--bw-glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--bw-glass-line);
+  box-shadow: var(--bw-glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+@utility bw-glass-strong {
+  background-color: var(--bw-glass-strong);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--bw-glass-line);
+  box-shadow: var(--bw-glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Teks di atas permukaan kaca butuh warna eksplisit, tidak boleh ikut warna
+   teks utama, supaya kontrasnya tidak hilang di mode terang. */
+@utility bw-glass-text {
+  color: var(--bw-ink);
 }
 
 @keyframes bw-marquee {
@@ -76,8 +285,27 @@
   animation-play-state: paused;
 }
 
+/* Semua gerak dihentikan kalau pengguna meminta reduced motion. */
 @media (prefers-reduced-motion: reduce) {
-  .bw-marquee-track {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Kalau pengguna tidak ingin transparansi (dikentang di iOS dan Android),
+   permukaan kaca diganti isian pekat supaya teks tetap terbaca dan
+   kontrasnya tidak bergantung pada apa yang ada di belakangnya. */
+@media (prefers-reduced-transparency: reduce) {
+  .bw-glass,
+  .bw-glass-strong {
+    background-color: var(--bw-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: var(--shadow-card);
   }
 }
