@@ -11,7 +11,13 @@ import AddToCalendar from './AddToCalendar';
 import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
 import { showToast } from '../lib/toast';
-import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
+import {
+  getSlots,
+  jadwalSelesai,
+  resolveAgenda,
+  sortByAgenda,
+  sortSlots,
+} from '../lib/slots';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
 
 const TICK_MS = 30 * 1000;
@@ -179,9 +185,11 @@ export default function Dashboard() {
   }, []);
 
   const visibleSchedules = useMemo(() => {
-    if (!divisiFilter) return schedules;
-    return schedules.filter((item) => item.pembuat_divisi === divisiFilter);
-  }, [schedules, divisiFilter]);
+    const dasar = divisiFilter
+      ? schedules.filter((item) => item.pembuat_divisi === divisiFilter)
+      : schedules;
+    return sortByAgenda(dasar, now);
+  }, [schedules, divisiFilter, now]);
 
   const nextItem = useMemo(() => {
     let best = null;
@@ -452,7 +460,7 @@ export default function Dashboard() {
           visibleSchedules.map((schedule) => {
             const slots = sortSlots(getSlots(schedule));
             const agenda = resolveAgenda(slots, now);
-            const sudahLewat = agenda.state === 'done';
+            const sudahLewat = jadwalSelesai(schedule, now);
             const sisa =
               agenda.state === 'ongoing'
                 ? 'Sedang berlangsung'
@@ -548,13 +556,31 @@ export default function Dashboard() {
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <p
-                      className={`max-w-[6.5rem] text-xs font-bold ${
-                        sudahLewat ? 'text-bw-muted' : 'text-bw-blue'
-                      }`}
-                    >
-                      {schedule.status === 'Aktif' ? sisa : schedule.status}
-                    </p>
+                    {sudahLewat ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-bw-surface px-2.5 py-1 text-xs font-bold text-bw-muted">
+                        <svg
+                          className="h-3.5 w-3.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M4.5 12.5l5 5 10-11" />
+                        </svg>
+                        Selesai
+                      </span>
+                    ) : (
+                      <p
+                        className={`text-xs font-bold ${
+                          sudahLewat ? 'text-bw-muted' : 'text-bw-blue'
+                        }`}
+                      >
+                        {schedule.status === 'Aktif' ? sisa : schedule.status}
+                      </p>
+                    )}
                     {schedule.pembuat_id === session.user.id && (
                       <div className="mt-2.5 flex flex-col items-end gap-1.5">
                         <button

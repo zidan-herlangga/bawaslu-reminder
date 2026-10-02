@@ -5,7 +5,12 @@ import useSession from '../hooks/useSession';
 import useSchedules from '../hooks/useSchedules';
 import AddToCalendar from './AddToCalendar';
 import ConfirmDialog from './ConfirmDialog';
-import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
+import {
+  getSlots,
+  resolveAgenda,
+  sesiSelesai,
+  sortSlots,
+} from '../lib/slots';
 import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
 import { showToast } from '../lib/toast';
@@ -287,6 +292,24 @@ export default function Kalender() {
   const selectedItems = schedulesByDay.get(selected) ?? [];
   const liburSelected = getHariLibur(selected);
 
+// Baris kalender adalah pasangan { schedule, slot }. Satu jadwal bisa punya
+  // beberapa sesi, jadi urutan dan badge mengikuti sesinya sendiri, bukan
+  // seluruh jadwal.
+  const urutkanBaris = (baris, saatIni) =>
+    [...baris].sort((a, b) => {
+      const lewatA = sesiSelesai(a.slot, saatIni);
+      const lewatB = sesiSelesai(b.slot, saatIni);
+
+      if (lewatA !== lewatB) return lewatA ? 1 : -1;
+
+      const mulaiA = new Date(a.slot.mulai).getTime();
+      const mulaiB = new Date(b.slot.mulai).getTime();
+
+      // Yang sudah lewat diurutkan terbaru dulu supaya yang baru saja
+      // berakhir tetap terlihat di bagian paling atas kelompok bawah.
+      return lewatA ? mulaiB - mulaiA : mulaiA - mulaiB;
+    });
+
   const cocokFilter = (item) => {
     const slot = sortSlots(getSlots(item));
 
@@ -337,10 +360,15 @@ export default function Kalender() {
       sortSlots(getSlots(item)).forEach((slot) => rows.push({ schedule: item, slot }));
     });
 
-    return rows.sort((a, b) => new Date(a.slot.mulai) - new Date(b.slot.mulai));
+    return urutkanBaris(rows, now);
   }, [cari, schedules, filterStatus, hanyaMilikSaya, filterDivisi, now, session]);
 
-  const visibleSelectedItems = selectedItems.filter(({ schedule }) => cocokFilter(schedule));
+  const visibleSelectedItems = useMemo(() => {
+    const tersaring = selectedItems.filter(({ schedule }) => cocokFilter(schedule));
+    return urutkanBaris(tersaring, now);
+    // cocokFilter membaca filterStatus, hanyaMilikSaya, filterDivisi, dan now,
+    // jadi semuanya ikut jadi dependensi.
+  }, [selectedItems, filterStatus, hanyaMilikSaya, filterDivisi, now]);
   const rowsToRender = modeCari ? hasilCari.slice(0, BATAS_HASIL) : visibleSelectedItems;
   const filterAktif =
     modeCari || filterStatus !== 'semua' || hanyaMilikSaya || Boolean(filterDivisi);
@@ -747,7 +775,7 @@ export default function Kalender() {
             {rowsToRender.map(({ schedule: item, slot }) => {
               const style = KATEGORI_STYLE[item.kategori] ?? KATEGORI_STYLE['Lainnya'];
               const accent = KATEGORI_ACCENT[item.kategori] ?? KATEGORI_ACCENT['Lainnya'];
-              const sudahLewat = new Date(slot.mulai).getTime() < now;
+              const sudahLewat = sesiSelesai(slot, now);
               const slots = sortSlots(getSlots(item));
               const totalSlots = slots.length;
               const isOwner = item.pembuat_id === session.user.id;
@@ -815,13 +843,27 @@ export default function Kalender() {
                         {item.judul}
                       </p>
 
-                      <p
-                        className={`mt-0.5 text-xs font-semibold ${
-                          sudahLewat ? 'text-bw-muted' : 'text-bw-blue'
-                        }`}
-                      >
-                        {sisa}
-                      </p>
+                      {sudahLewat ? (
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-bw-surface px-2.5 py-1 text-xs font-bold text-bw-muted">
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M4.5 12.5l5 5 10-11" />
+                          </svg>
+                          Selesai
+                        </span>
+                      ) : (
+                        <p className="mt-0.5 text-xs font-semibold text-bw-blue">
+                          {sisa}
+                        </p>
+                      )}
 
                       {modeCari && (
                         <button
