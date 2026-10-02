@@ -190,12 +190,22 @@ function preloadSemuaNada() {
   semuaUrlNada().forEach((url) => {
     const el = playerUntuk(url);
     if (!el) return;
+
     el.muted = true;
+
+    // play() lalu pause() disimpan supaya browser benar-benar mengunduh file.
+    // Promise-nya harus ditangkap: tanpa catch, penolakan AbortError dari
+    // pause() sesaat setelah play() muncul sebagai galat tak tertangani di
+    // console. Penolakan ini memang wajar dan tidak mengganggu apa pun.
     try {
-      el.play();
+      const promise = el.play();
+      if (promise && typeof promise.catch === 'function') {
+        promise.catch(() => {});
+      }
     } catch {
       /* preload tetap berjalan walau autoplay diblokir */
     }
+
     el.pause();
     el.currentTime = 0;
     el.muted = false;
