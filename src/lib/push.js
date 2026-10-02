@@ -87,7 +87,51 @@ async function saveSubscription(session, subscription) {
   };
 }
 
+// navigator.serviceWorker.register() selesai begitu registration dibuat, bukan
+// begitu service worker aktif. Kalau subscribe() dipanggil pada saat itu,
+// browser menolak dengan "Subscription failed - no active Service Worker".
+//
+// Fungsi ini menunggu worker benar-benar active, dan menolak dengan pesan yang
+// jelas kalau memang tidak mau aktif, supaya kegagalannya tidak terlihat diam-diam.
+function waitForActiveServiceWorker(registration, timeoutMs = 15000) {
+  if (registration.active) return Promise.resolve(registration);
+
+  return new Promise((resolve, reject) => {
+    const worker = registration.installing || registration.waiting;
+
+    if (!worker) {
+      reject(new Error('Service worker tidak mulai di-install.'));
+      return;
+    }
+
+    let timer = null;
+
+    const selesai = (salah, pesan) => {
+      if (timer) clearTimeout(timer);
+      worker.removeEventListener('statechange', onPerubahan);
+
+      if (salah) reject(new Error(pesan));
+      else resolve(registration);
+    };
+
+    const onPerubahan = () => {
+      if (worker.state === 'activated') selesai(false);
+      else if (worker.state === 'redundant') selesai(true, 'Service worker gagal di-install.');
+    };
+
+    worker.addEventListener('statechange', onPerubahan);
+    timer = setTimeout(
+      () => selesai(true, 'Service worker belum aktif setelah 15 detik. Muat ulang halaman lalu coba lagi.'),
+      timeoutMs
+    );
+
+    // State mungkin sudah aktif di antara pengecekan awal dan pemasangan listener.
+    if (worker.state === 'activated') selesai(false);
+  });
+}
+
 async function subscribeFresh(registration) {
+  // Penting: tunggu worker aktif dulu sebelum subscribe.
   try {
     return await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -95,6 +139,11 @@ async function subscribeFresh(registration) {
     });
   } catch (subscribeError) {
     const message = String(subscribeError?.message || subscribeError);
+    if (/no active service worker/i.test(message)) {
+      throw new Error(
+        'Service worker belum aktif. Muat ulang halaman lalu aktifkan notifikasi lagi.'
+      );
+    }
     if (!/applicationServerKey|gcm_sender_id/i.test(message)) throw subscribeError;
     await dropSubscription(await registration.pushManager.getSubscription());
     return registration.pushManager.subscribe({
@@ -113,7 +162,12 @@ export async function ensurePushSubscription(session) {
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 
-    let subscription = await resolveSubscription(registration);
+    // Tunggu worker aktif. Tanpa ini, subscribe() ditolak dengan
+    // "no active Service Worker" dan pengguna tidak pernah punya langganan
+    // sehingga notifikasi tidak akan pernah sampai.
+    const siap = await waitForActiveServiceWorker(registration);
+
+    let subscription = await resolveSubscription(siap);
     if (subscription) {
       const saved = await saveSubscription(session, subscription);
       if (saved.ok) return saved;
@@ -123,7 +177,7 @@ export async function ensurePushSubscription(session) {
       subscription = null;
     }
 
-    subscription = await subscribeFresh(registration);
+    subscription = await subscribeFresh(siap);
     return await saveSubscription(session, subscription);
   } catch (error) {
     return { ok: false, reason: 'error', message: error?.message ?? String(error) };
