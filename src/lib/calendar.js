@@ -53,7 +53,7 @@ export function buildIcs(schedule, slotsInput) {
   const stamp = utcStamp(new Date().toISOString());
   const lines = [
     'BEGIN:VCALENDAR',
-    'PRODID:-//Bawaslu Kota Bekasi//Sistem Pengingat Jadwal//ID',
+    'PRODID:-//Bawaslu Bekasi Kota//Sistem Pengingat Jadwal//ID',
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',

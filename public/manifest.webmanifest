@@ -1,7 +1,7 @@
 {
-  "name": "Bawaslu Kota Bekasi - Pengingat Jadwal",
+  "name": "Bawaslu Bekasi Kota - Pengingat Jadwal",
   "short_name": "Bawaslu Jadwal",
-  "description": "Sistem pengingat jadwal internal Bawaslu Kota Bekasi.",
+  "description": "Sistem pengingat jadwal internal Bawaslu Bekasi Kota.",
   "lang": "id",
   "dir": "ltr",
   "start_url": "/",

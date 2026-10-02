@@ -163,7 +163,7 @@ export default function Login() {
         </div>
 
         <p className="mt-4 text-center text-xs leading-relaxed text-bw-muted">
-          Aplikasi internal Bawaslu Kota Bekasi dengan akses terbatas.
+          Aplikasi internal Bawaslu Bekasi Kota dengan akses terbatas.
         </p>
       </div>
     </div>
