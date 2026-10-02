@@ -80,7 +80,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-bw-ink/45 p-4 backdrop-blur-[2px] sm:items-center"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bw-ink/45 p-4 backdrop-blur-[2px] sm:items-center"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onBatal();
       }}

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import useSchedules from '../hooks/useSchedules';
 import AddToCalendar from './AddToCalendar';
 import ConfirmDialog from './ConfirmDialog';
+import DetailJadwal from './DetailJadwal';
 import {
   getSlots,
   resolveAgenda,
@@ -15,6 +16,13 @@ import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
 import { showToast } from '../lib/toast';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
+import {
+  formatJam,
+  formatSisa,
+  formatTanggalPanjang,
+  formatTanggalPendek,
+  formatWaktuLengkap,
+} from '../lib/formatWaktu';
 import { getHariLibur, labelJenis } from '../data/hariLibur';
 
 const TICK_MS = 30 * 1000;
@@ -64,57 +72,6 @@ function buildMonthGrid(view) {
   return cells;
 }
 
-function formatJam(iso) {
-  return new Date(iso).toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatTanggalPanjang(date) {
-  return date.toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-function formatWaktuLengkap(iso) {
-  return new Date(iso).toLocaleString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatTanggalPendek(iso) {
-  return new Date(iso).toLocaleDateString('id-ID', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatSisa(targetMs, now) {
-  const diff = targetMs - now;
-  if (diff <= 0) return 'Sudah dimulai';
-
-  const totalMinutes = Math.floor(diff / 60000);
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) return `${days} hari lagi`;
-  if (hours > 0) return `${hours} jam ${minutes} menit lagi`;
-  if (minutes > 0) return `${minutes} menit lagi`;
-  return 'Kurang dari 1 menit';
-}
-
 function ChevronButton({ direction, onClick, label }) {
   return (
     <button
@@ -151,7 +108,8 @@ export default function Kalender() {
   const [now, setNow] = useState(() => Date.now());
   const [remind, setRemind] = useState({ id: '', status: '', message: '' });
   const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
-  const [detailOpen, setDetailOpen] = useState({});
+  const [detailTerbuka, setDetailTerbuka] = useState(null);
+  const navigate = useNavigate();
   const [konfirmasiHapus, setKonfirmasiHapus] = useState(null);
   const [hapusBusy, setHapusBusy] = useState(false);
   const [cari, setCari] = useState('');
@@ -240,8 +198,12 @@ export default function Kalender() {
     }
   };
 
-  const toggleDetail = (id) => {
-    setDetailOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleDetail = (jadwal, sesi) => {
+    setDetailTerbuka((prev) =>
+      prev?.schedule?.id === jadwal.id && prev?.slot?.mulai === sesi?.mulai
+        ? null
+        : { schedule: jadwal, slot: sesi }
+    );
   };
 
   const schedulesByDay = useMemo(() => {
@@ -779,8 +741,7 @@ export default function Kalender() {
               const slots = sortSlots(getSlots(item));
               const totalSlots = slots.length;
               const isOwner = item.pembuat_id === session.user.id;
-              const isOpen = Boolean(detailOpen[item.id]);
-              const reminded = remind.id === item.id;
+                            const reminded = remind.id === item.id;
               const sending = reminded && remind.status === 'busy';
               const agenda = resolveAgenda(slots, now);
               const sisa =
@@ -887,86 +848,10 @@ export default function Kalender() {
                         </button>
                       )}
 
-                      {!isOpen && item.deskripsi && (
+                      {item.deskripsi && (
                         <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-xs leading-relaxed text-bw-muted">
                           {item.deskripsi}
                         </p>
-                      )}
-
-                      {isOpen && (
-                        <div className="mt-2 space-y-2 rounded-xl bg-bw-surface p-3">
-                          <div>
-                            <p className="text-xs font-semibold text-bw-muted">
-                              Waktu
-                            </p>
-                            <p className="mt-0.5 text-xs font-semibold text-bw-ink">
-                              {formatWaktuLengkap(slot.mulai)}
-                              {slot.selesai && ` - ${formatJam(slot.selesai)}`}
-                            </p>
-                          </div>
-
-                          {totalSlots > 1 && (
-                            <div>
-                              <p className="text-xs font-semibold text-bw-muted">
-                                Seluruh sesi
-                              </p>
-                              <ul className="mt-1 space-y-1">
-                                {slots.map((row) => (
-                                  <li
-                                    key={row.mulai}
-                                    className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs"
-                                  >
-                                    <span
-                                      className={`font-semibold ${
-                                        row.mulai === slot.mulai
-                                          ? 'text-bw-blue'
-                                          : 'text-bw-ink'
-                                      }`}
-                                    >
-                                      {formatJam(row.mulai)}
-                                      {row.selesai && ` - ${formatJam(row.selesai)}`}
-                                    </span>
-                                    <span className="text-bw-muted">
-                                      {formatTanggalPendek(row.mulai)}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {item.deskripsi && (
-                            <div>
-                              <p className="text-xs font-semibold text-bw-muted">
-                                Keterangan
-                              </p>
-                              <p className="mt-0.5 whitespace-pre-line break-words text-xs leading-relaxed text-bw-ink">
-                                {item.deskripsi}
-                              </p>
-                            </div>
-                          )}
-
-                          <div>
-                            <p className="text-xs font-semibold text-bw-muted">
-                              Dibuat oleh
-                            </p>
-                            <p className="mt-0.5 text-xs text-bw-ink">
-                              {item.pembuat_nama} -{' '}
-                              {DIVISI_SHORT[item.pembuat_divisi] ?? item.pembuat_divisi}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-semibold text-bw-muted">
-                              Ditujukan untuk
-                            </p>
-                            <p className="mt-0.5 text-xs text-bw-ink">
-                              {item.target_divisi
-                                ? `Divisi ${item.target_divisi}`
-                                : 'Semua staf'}
-                            </p>
-                          </div>
-                        </div>
                       )}
 
                       {reminded && remind.message && (
@@ -1015,11 +900,11 @@ export default function Kalender() {
 
                     <button
                       type="button"
-                      onClick={() => toggleDetail(item.id)}
-                      aria-expanded={isOpen}
+                      onClick={() => toggleDetail(item, slot)}
+                      aria-haspopup="dialog"
                       className="h-11 rounded-xl border border-bw-line bg-bw-card px-4 text-sm font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                     >
-                      {isOpen ? 'Sembunyikan' : 'Detail'}
+                      Detail
                     </button>
 
                     {isOwner && (
@@ -1070,6 +955,52 @@ export default function Kalender() {
         sibuk={hapusBusy}
         onBatal={() => setKonfirmasiHapus(null)}
         onSetuju={() => konfirmasiHapus && handleDelete(konfirmasiHapus)}
+      />
+
+      <DetailJadwal
+        open={Boolean(detailTerbuka)}
+        jadwal={detailTerbuka?.schedule}
+        sesi={detailTerbuka?.slot}
+        now={now}
+        userId={session.user.id}
+        onTutup={() => setDetailTerbuka(null)}
+        onIngatkan={
+          detailTerbuka ? () => handleRemind(detailTerbuka.schedule) : undefined
+        }
+        kirimBusy={Boolean(
+          detailTerbuka &&
+            remind.id === detailTerbuka.schedule.id &&
+            remind.status === 'busy'
+        )}
+        kirimLabel={
+          detailTerbuka &&
+          remind.id === detailTerbuka.schedule.id &&
+          remind.status === 'busy'
+            ? 'Mengirim...'
+            : 'Ingatkan'
+        }
+        pesanKirim={
+          detailTerbuka && remind.id === detailTerbuka.schedule.id
+            ? remind.message
+            : ''
+        }
+        onUbah={
+          detailTerbuka
+            ? () => navigate(`/jadwal/${detailTerbuka.schedule.id}/edit`)
+            : undefined
+        }
+        onHapus={
+          detailTerbuka
+            ? () => {
+                setKonfirmasiHapus(detailTerbuka.schedule);
+                setDetailTerbuka(null);
+              }
+            : undefined
+        }
+        onBukaTanggal={(iso) => {
+          setDetailTerbuka(null);
+          bukaTanggal(iso);
+        }}
       />
     </div>
   );

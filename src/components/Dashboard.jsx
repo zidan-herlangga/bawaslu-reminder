@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import fetchProfile from '../lib/fetchProfile';
 import useSession from '../hooks/useSession';
@@ -7,6 +7,7 @@ import useDueReminder from '../hooks/useDueReminder';
 import useSchedules from '../hooks/useSchedules';
 import ClockWidget from './ClockWidget';
 import ConfirmDialog from './ConfirmDialog';
+import DetailJadwal from './DetailJadwal';
 import AddToCalendar from './AddToCalendar';
 import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
@@ -19,6 +20,12 @@ import {
   sortSlots,
 } from '../lib/slots';
 import { DIVISI_FILTER_OPTIONS, DIVISI_SHORT } from '../constants/options';
+import {
+  formatJam,
+  formatSisa,
+  formatTanggalPendek,
+  formatWaktuLengkap,
+} from '../lib/formatWaktu';
 
 const TICK_MS = 30 * 1000;
 
@@ -35,49 +42,6 @@ const KATEGORI_ACCENT = {
   Pengawasan: 'bg-bw-green-500',
   Lainnya: 'bg-bw-line',
 };
-
-function formatWaktu(iso) {
-  return new Date(iso).toLocaleString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatSisa(targetMs, now) {
-  const diff = targetMs - now;
-
-  if (diff <= 0) return 'Sudah dimulai';
-
-  const totalMinutes = Math.floor(diff / 60000);
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) return `${days} hari lagi`;
-  if (hours > 0) return `${hours} jam ${minutes} menit lagi`;
-  if (minutes > 0) return `${minutes} menit lagi`;
-  return 'Kurang dari 1 menit';
-}
-
-function formatJam(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatTanggalPendek(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('id-ID', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-}
 
 function splitCountdown(targetMs, now) {
   const diff = targetMs - now;
@@ -102,6 +66,8 @@ export default function Dashboard() {
   const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
   const [konfirmasiHapus, setKonfirmasiHapus] = useState(null);
   const [hapusBusy, setHapusBusy] = useState(false);
+  const [detailJadwal, setDetailJadwal] = useState(null);
+  const navigate = useNavigate();
 
   const handleHapus = async (schedule) => {
     setHapusBusy(true);
@@ -150,7 +116,7 @@ export default function Dashboard() {
       setRemind({ id: schedule.id, status: 'ok', message });
 
       const slots = sortSlots(getSlots(schedule));
-      const waktu = slots.length ? formatWaktu(slots[0].mulai) : '';
+      const waktu = slots.length ? formatWaktuLengkap(slots[0].mulai) : '';
 
       await playReminderSound(schedule.kategori);
       await notifyNow({
@@ -632,7 +598,17 @@ export default function Dashboard() {
                     {schedule.pembuat_nama} -{' '}
                     {DIVISI_SHORT[schedule.pembuat_divisi] ?? schedule.pembuat_divisi}
                   </p>
-                  <AddToCalendar schedule={schedule} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setDetailJadwal(schedule)}
+                      aria-label={`Lihat detail jadwal ${schedule.judul}`}
+                      className="inline-flex h-9 items-center rounded-full bg-bw-blue-50 px-3 text-xs font-bold text-bw-blue-700 transition-colors hover:bg-bw-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
+                    >
+                      Detail
+                    </button>
+                    <AddToCalendar schedule={schedule} />
+                  </div>
                 </footer>
               </article>
             );
@@ -651,6 +627,48 @@ export default function Dashboard() {
         sibuk={hapusBusy}
         onBatal={() => setKonfirmasiHapus(null)}
         onSetuju={() => konfirmasiHapus && handleHapus(konfirmasiHapus)}
+      />
+
+      <DetailJadwal
+        open={Boolean(detailJadwal)}
+        jadwal={detailJadwal}
+        now={now}
+        userId={session.user.id}
+        onTutup={() => setDetailJadwal(null)}
+        onIngatkan={
+          detailJadwal ? () => handleRemind(detailJadwal) : undefined
+        }
+        kirimBusy={Boolean(
+          detailJadwal &&
+            remind.id === detailJadwal.id &&
+            remind.status === 'busy'
+        )}
+        kirimLabel={
+          detailJadwal &&
+          remind.id === detailJadwal.id &&
+          remind.status === 'busy'
+            ? 'Mengirim...'
+            : 'Ingatkan'
+        }
+        pesanKirim={
+          detailJadwal && remind.id === detailJadwal.id ? remind.message : ''
+        }
+        onUbah={
+          detailJadwal
+            ? () => navigate(`/jadwal/${detailJadwal.id}/edit`)
+            : undefined
+        }
+        onHapus={
+          detailJadwal
+            ? () => {
+                setKonfirmasiHapus({
+                  id: detailJadwal.id,
+                  judul: detailJadwal.judul,
+                });
+                setDetailJadwal(null);
+              }
+            : undefined
+        }
       />
     </div>
   );
