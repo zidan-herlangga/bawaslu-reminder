@@ -17,9 +17,9 @@
   --bw-red-50: #fdecee;
   --bw-red-100: #f9d8dd;
   /* Merah pekat untuk isian yang di atasnya teks putih (tombol Hapus, badge).
-     Token --bw-red dipakai sebagai warna teks dan ikut menjadi merah terang di
-     mode gelap; kalau dipakai juga sebagai latar, teks putih di atasnya hanya
-     2,8:1. Nilai ini sengaja tidak berubah saat tema berganti. */
+     Token --bw-red dipakai sebagai warna teks dan ikut berubah jadi merah
+     terang di mode gelap; kalau dipakai juga sebagai latar, teks putih di
+     atasnya hanya 2,8:1. Nilai ini sengaja tidak berubah saat tema berganti. */
   --bw-red-solid: #c10841;
 
   --bw-amber: #a85b00;
@@ -233,10 +233,10 @@
   }
 }
 
-/* Jarak aman perangkat. Dipakai max() supaya tidak bisa kalah dari kelas
-   padding biasa seperti pb-3: nilai di sini selalu minimal, dan tetap menambah
-   ruang pada perangkat yang punya home indicator. */
 @utility safe-bottom {
+  /* Dipakai max() supaya tidak bisa kalah dari kelas padding biasa seperti
+     pb-3: nilai di sini selalu minimal, dan tetap menambah ruang pada
+     perangkat yang punya home indicator. */
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
@@ -274,16 +274,17 @@
   color: var(--bw-ink);
 }
 
-   lembaga yang sudah tercetak di title dan favicon, jadi gerakannya menarik
-   terbaca sekali glance dan tidak ada yang bergerak di tepi layar. */
-  display: flex;
-  justify-content: center;
-
+/* Semua gerak dihentikan kalau pengguna meminta reduced motion. */
 @media (prefers-reduced-motion: reduce) {
+  *,
   *::before,
+  *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+}
 
 /* Kalau pengguna tidak ingin transparansi (dikentang di iOS dan Android),
    permukaan kaca diganti isian pekat supaya teks tetap terbaca dan
