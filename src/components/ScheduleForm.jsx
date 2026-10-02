@@ -5,6 +5,7 @@ import { DIVISI_OPTIONS, KATEGORI_OPTIONS } from '../constants/options';
 import useSession from '../hooks/useSession';
 import fetchProfile from '../lib/fetchProfile';
 import { getSlots } from '../lib/slots';
+import { showToast } from '../lib/toast';
 
 const EMPTY_SLOT = { mulai: '', selesai: '' };
 
@@ -317,6 +318,12 @@ export default function ScheduleForm() {
       }
 
       console.info(`[Schedule] jadwal ${isEdit ? 'diperbarui' : 'tersimpan'}, kembali ke /`);
+      // Kabari berhasilnya simpan. Sebelumnya halaman langsung balik ke daftar
+      // tanpa jejak, sehingga orang mengira simpanannya gagal lalu mengulang.
+      showToast(
+        isEdit ? 'Perubahan jadwal tersimpan.' : 'Jadwal baru tersimpan dan staf sudah diberi tahu.',
+        'success'
+      );
       navigate('/', { replace: true });
     } catch (error) {
       console.error('[Schedule] gagal:', error?.code, error?.message);

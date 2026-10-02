@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import useSchedules from '../hooks/useSchedules';
 import AddToCalendar from './AddToCalendar';
+import ConfirmDialog from './ConfirmDialog';
 import { getSlots, resolveAgenda, sortSlots } from '../lib/slots';
 import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
@@ -115,7 +116,7 @@ function ChevronButton({ direction, onClick, label }) {
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-bw-line bg-bw-card text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-bw-line bg-bw-card text-bw-muted transition-colors hover:border-bw-blue hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
     >
       <svg
         className={`h-4 w-4 ${direction === 'right' ? 'rotate-180' : ''}`}
@@ -146,6 +147,8 @@ export default function Kalender() {
   const [remind, setRemind] = useState({ id: '', status: '', message: '' });
   const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
   const [detailOpen, setDetailOpen] = useState({});
+  const [konfirmasiHapus, setKonfirmasiHapus] = useState(null);
+  const [hapusBusy, setHapusBusy] = useState(false);
   const [cari, setCari] = useState('');
   const [filterStatus, setFilterStatus] = useState('semua');
   const [filterDivisi, setFilterDivisi] = useState('');
@@ -206,25 +209,30 @@ export default function Kalender() {
   };
 
   const handleDelete = async (schedule) => {
-    if (!window.confirm('Hapus jadwal ini?')) return;
+    setHapusBusy(true);
 
-    const { data, error } = await supabase
-      .from('schedules')
-      .delete()
-      .eq('id', schedule.id)
-      .select('id');
+    try {
+      const { data, error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', schedule.id)
+        .select('id');
 
-    if (error || !data?.length) {
-      showToast(
-        error?.message ??
-          'Jadwal tidak terhapus (0 baris terpengaruh). Periksa aturan RLS di schema.sql.',
-        'error'
-      );
-      return;
+      if (error || !data?.length) {
+        showToast(
+          error?.message ??
+            'Jadwal tidak terhapus (0 baris terpengaruh). Periksa aturan RLS di schema.sql.',
+          'error'
+        );
+        return;
+      }
+
+      showToast('Jadwal dihapus.', 'success');
+      loadSchedules();
+    } finally {
+      setHapusBusy(false);
+      setKonfirmasiHapus(null);
     }
-
-    showToast('Jadwal dihapus.', 'success');
-    loadSchedules();
   };
 
   const toggleDetail = (id) => {
@@ -405,7 +413,7 @@ export default function Kalender() {
           {WEEKDAYS.map((day) => (
             <div
               key={day}
-              className={`pb-1 text-center text-[11px] font-bold uppercase tracking-wide ${
+              className={`pb-1 text-center text-xs font-bold uppercase tracking-wide ${
                 day === 'Min' ? 'text-bw-red' : 'text-bw-muted'
               }`}
             >
@@ -533,14 +541,14 @@ export default function Kalender() {
               onChange={(event) => setCari(event.target.value)}
               placeholder="Cari judul, keterangan, atau pembuat"
               aria-label="Cari jadwal"
-              className="w-full rounded-xl border border-bw-line bg-bw-card py-2.5 pl-9 pr-9 text-sm text-bw-ink outline-none transition-colors placeholder:text-bw-muted focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
+              className="w-full rounded-xl border border-bw-line bg-bw-card py-2.5 pl-9 pr-12 text-sm text-bw-ink outline-none transition-colors placeholder:text-bw-muted focus:border-bw-blue focus:ring-2 focus:ring-bw-blue/20"
             />
             {cari && (
               <button
                 type="button"
                 onClick={() => setCari('')}
                 aria-label="Bersihkan pencarian"
-                className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-bw-muted transition-colors hover:bg-bw-surface hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-bw-muted transition-colors hover:bg-bw-surface hover:text-bw-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
               >
                 <svg
                   className="h-3.5 w-3.5"
@@ -664,9 +672,31 @@ export default function Kalender() {
         {listError && (
           <div
             role="alert"
-            className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+            className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3.5 text-xs leading-relaxed text-bw-red"
           >
-            {listError}
+            <p className="font-semibold">Jadwal tidak bisa dimuat.</p>
+            <p className="mt-1 opacity-90">{listError}</p>
+            <button
+              type="button"
+              onClick={() => loadSchedules()}
+              disabled={listLoading}
+              className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl bg-bw-red-solid px-4 text-sm font-bold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-red/40 disabled:opacity-50"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 4v5h-5" />
+              </svg>
+              {listLoading ? 'Mencoba lagi...' : 'Coba lagi'}
+            </button>
           </div>
         )}
 
@@ -758,11 +788,11 @@ export default function Kalender() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${style}`}
+                          className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${style}`}
                         >
                           {item.kategori}
                         </span>
-                        <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
+                        <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-xs font-bold text-bw-blue-700 ring-1 ring-bw-blue-200">
                           {item.target_divisi
                             ? `Khusus ${
                                 DIVISI_SHORT[item.target_divisi] ?? item.target_divisi
@@ -770,12 +800,12 @@ export default function Kalender() {
                             : 'Semua staf'}
                         </span>
                         {totalSlots > 1 && (
-                          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
+                          <span className="rounded-full bg-bw-surface px-2 py-0.5 text-xs font-bold text-bw-muted ring-1 ring-bw-line">
                             {totalSlots} sesi
                           </span>
                         )}
                         {item.status !== 'Aktif' && (
-                          <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-red ring-1 ring-bw-red-100">
+                          <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-xs font-bold text-bw-red ring-1 ring-bw-red-100">
                             {item.status}
                           </span>
                         )}
@@ -824,7 +854,7 @@ export default function Kalender() {
                       {isOpen && (
                         <div className="mt-2 space-y-2 rounded-xl bg-bw-surface p-3">
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-bw-muted">
+                            <p className="text-xs font-semibold text-bw-muted">
                               Waktu
                             </p>
                             <p className="mt-0.5 text-xs font-semibold text-bw-ink">
@@ -835,7 +865,7 @@ export default function Kalender() {
 
                           {totalSlots > 1 && (
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-bw-muted">
+                              <p className="text-xs font-semibold text-bw-muted">
                                 Seluruh sesi
                               </p>
                               <ul className="mt-1 space-y-1">
@@ -865,7 +895,7 @@ export default function Kalender() {
 
                           {item.deskripsi && (
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-bw-muted">
+                              <p className="text-xs font-semibold text-bw-muted">
                                 Keterangan
                               </p>
                               <p className="mt-0.5 whitespace-pre-line break-words text-xs leading-relaxed text-bw-ink">
@@ -875,7 +905,7 @@ export default function Kalender() {
                           )}
 
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-bw-muted">
+                            <p className="text-xs font-semibold text-bw-muted">
                               Dibuat oleh
                             </p>
                             <p className="mt-0.5 text-xs text-bw-ink">
@@ -885,7 +915,7 @@ export default function Kalender() {
                           </div>
 
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-bw-muted">
+                            <p className="text-xs font-semibold text-bw-muted">
                               Ditujukan untuk
                             </p>
                             <p className="mt-0.5 text-xs text-bw-ink">
@@ -945,7 +975,7 @@ export default function Kalender() {
                       type="button"
                       onClick={() => toggleDetail(item.id)}
                       aria-expanded={isOpen}
-                      className="rounded-xl border border-bw-line bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                      className="h-11 rounded-xl border border-bw-line bg-bw-card px-4 text-sm font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                     >
                       {isOpen ? 'Sembunyikan' : 'Detail'}
                     </button>
@@ -954,14 +984,16 @@ export default function Kalender() {
                       <>
                         <Link
                           to={`/jadwal/${item.id}/edit`}
-                          className="rounded-xl border border-bw-line bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                          aria-label={`Ubah jadwal ${item.judul}`}
+                          className="grid h-11 place-items-center rounded-xl border border-bw-line bg-bw-card px-4 text-sm font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                         >
-                          Edit
+                          Ubah
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleDelete(item)}
-                          className="rounded-xl border border-bw-red-100 bg-bw-card px-3 py-1.5 text-xs font-bold text-bw-red transition-colors hover:border-bw-red hover:bg-bw-red-50 focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                          onClick={() => setKonfirmasiHapus(item)}
+                          aria-label={`Hapus jadwal ${item.judul}`}
+                          className="h-11 rounded-xl border border-bw-red-100 bg-bw-card px-4 text-sm font-bold text-bw-red transition-colors hover:border-bw-red hover:bg-bw-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-red/40"
                         >
                           Hapus
                         </button>
@@ -983,6 +1015,20 @@ export default function Kalender() {
           </p>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(konfirmasiHapus)}
+        judul="Hapus jadwal?"
+        pesan={
+          konfirmasiHapus
+            ? `"${konfirmasiHapus.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
+            : ''
+        }
+        labelSetuju="Hapus"
+        sibuk={hapusBusy}
+        onBatal={() => setKonfirmasiHapus(null)}
+        onSetuju={() => konfirmasiHapus && handleDelete(konfirmasiHapus)}
+      />
     </div>
   );
 }

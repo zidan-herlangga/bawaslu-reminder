@@ -406,7 +406,7 @@ export default function TodoPage() {
                         type="button"
                         onClick={() => startEdit(todo)}
                         aria-label={`Ubah todo ${todo.teks}`}
-                        className="grid h-7 w-7 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                        className="grid h-11 w-11 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                       >
                         <svg
                           className="h-3.5 w-3.5"
@@ -421,7 +421,7 @@ export default function TodoPage() {
                         type="button"
                         onClick={() => removeTodo(todo)}
                         aria-label={`Hapus todo ${todo.teks}`}
-                        className="grid h-7 w-7 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-red-50 hover:text-bw-red focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                        className="grid h-11 w-11 place-items-center rounded-xl text-bw-muted transition-colors hover:bg-bw-red-50 hover:text-bw-red focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-red/40"
                       >
                         <svg
                           className="h-3.5 w-3.5"

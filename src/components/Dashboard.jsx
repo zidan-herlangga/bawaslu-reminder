@@ -6,6 +6,7 @@ import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
 import useSchedules from '../hooks/useSchedules';
 import ClockWidget from './ClockWidget';
+import ConfirmDialog from './ConfirmDialog';
 import AddToCalendar from './AddToCalendar';
 import { notifyNow, sendRemind } from '../lib/push';
 import { isSoundBusy, playReminderSound, subscribeSoundBusy } from '../lib/sound';
@@ -93,6 +94,35 @@ export default function Dashboard() {
   const [now, setNow] = useState(() => Date.now());
   const [remind, setRemind] = useState({ id: '', status: '', message: '' });
   const [soundBusy, setSoundBusy] = useState(() => isSoundBusy());
+  const [konfirmasiHapus, setKonfirmasiHapus] = useState(null);
+  const [hapusBusy, setHapusBusy] = useState(false);
+
+  const handleHapus = async (schedule) => {
+    setHapusBusy(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', schedule.id)
+        .select('id');
+
+      if (error || !data?.length) {
+        showToast(
+          error?.message ??
+            'Jadwal tidak terhapus (0 baris terpengaruh). Periksa aturan RLS di schema.sql.',
+          'error'
+        );
+        return;
+      }
+
+      showToast('Jadwal dihapus.', 'success');
+      loadSchedules();
+    } finally {
+      setHapusBusy(false);
+      setKonfirmasiHapus(null);
+    }
+  };
 
   useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
@@ -322,9 +352,31 @@ export default function Dashboard() {
       {listError && (
         <div
           role="alert"
-          className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3 text-xs leading-relaxed text-bw-red"
+          className="rounded-3xl border border-bw-red-100 bg-bw-red-50 px-4 py-3.5 text-xs leading-relaxed text-bw-red"
         >
-          {listError}
+          <p className="font-semibold">Jadwal tidak bisa dimuat.</p>
+          <p className="mt-1 opacity-90">{listError}</p>
+          <button
+            type="button"
+            onClick={() => loadSchedules()}
+            disabled={listLoading}
+            className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl bg-bw-red-solid px-4 text-sm font-bold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-red/40 disabled:opacity-50"
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 4v5h-5" />
+            </svg>
+            {listLoading ? 'Mencoba lagi...' : 'Coba lagi'}
+          </button>
         </div>
       )}
 
@@ -353,8 +405,18 @@ export default function Dashboard() {
             </svg>
             <p className="text-sm font-semibold text-bw-ink">Belum ada jadwal</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
-              Tekan tombol Buat untuk menambahkan pengingat pertama.
+              Belum ada pengingat yang perlu dipantau. Buat yang pertama agar
+              semua staf tahu waktunya.
             </p>
+            <Link
+              to="/jadwal/baru"
+              className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-bw-blue px-5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40 active:scale-[0.98]"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+              </svg>
+              Buat pengingat pertama
+            </Link>
           </div>
         )}
 
@@ -417,11 +479,11 @@ export default function Dashboard() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${style}`}
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${style}`}
                       >
                         {schedule.kategori}
                       </span>
-                      <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-blue-700 ring-1 ring-bw-blue-200">
+                      <span className="rounded-full bg-bw-blue-50 px-2 py-0.5 text-xs font-bold text-bw-blue-700 ring-1 ring-bw-blue-200">
                         {schedule.target_divisi
                           ? `Khusus ${
                               DIVISI_SHORT[schedule.target_divisi] ?? schedule.target_divisi
@@ -429,12 +491,12 @@ export default function Dashboard() {
                           : 'Semua staf'}
                       </span>
                       {schedule.status !== 'Aktif' && (
-                        <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-red ring-1 ring-bw-red-100">
+                        <span className="rounded-full bg-bw-red-50 px-2 py-0.5 text-xs font-bold text-bw-red ring-1 ring-bw-red-100">
                           {schedule.status}
                         </span>
                       )}
                       {slots.length > 1 && (
-                        <span className="rounded-full bg-bw-surface px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bw-muted ring-1 ring-bw-line">
+                        <span className="rounded-full bg-bw-surface px-2 py-0.5 text-xs font-bold text-bw-muted ring-1 ring-bw-line">
                           {slots.length} sesi
                         </span>
                       )}
@@ -502,43 +564,34 @@ export default function Dashboard() {
                             soundBusy ||
                             (remind.id === schedule.id && remind.status === 'busy')
                           }
-                          className="rounded-xl bg-bw-blue px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
+                          className="h-11 rounded-xl bg-bw-blue px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
                         >
                           {remind.id === schedule.id && remind.status === 'busy'
                             ? 'Mengirim...'
                             : 'Ingatkan'}
                         </button>
-                        <div className="flex items-center gap-1.5 text-xs font-semibold">
+
+                        {/* Edit dan Hapus dulunya hanya teks kecil dengan pemisah
+                            slash. Keduanya jadi tombol sungguhan supaya target
+                            sentuhnya cukup besar dan tidak salah-tekan. */}
+                        <div className="flex items-center gap-1.5">
                           <Link
                             to={`/jadwal/${schedule.id}/edit`}
-                            className="text-bw-muted transition-colors hover:text-bw-blue focus:outline-none focus:ring-2 focus:ring-bw-blue/40 rounded-lg"
+                            aria-label={`Ubah jadwal ${schedule.judul}`}
+                            className="grid h-9 min-w-16 place-items-center rounded-lg px-2 text-xs font-semibold text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                           >
-                            Edit
+                            Ubah
                           </Link>
-                          <span aria-hidden="true" className="text-bw-line">
-                            /
-                          </span>
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!window.confirm('Hapus jadwal ini?')) return;
-                              const { data, error } = await supabase
-                                .from('schedules')
-                                .delete()
-                                .eq('id', schedule.id)
-                                .select('id');
-                              if (error || !data?.length) {
-                                showToast(
-                                  error?.message ??
-                                    'Jadwal tidak terhapus (0 baris terpengaruh). Periksa aturan RLS di schema.sql.',
-                                  'error'
-                                );
-                                return;
-                              }
-                              showToast('Jadwal dihapus.', 'success');
-                              loadSchedules();
-                            }}
-                            className="rounded-lg text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                            onClick={() =>
+                              setKonfirmasiHapus({
+                                id: schedule.id,
+                                judul: schedule.judul,
+                              })
+                            }
+                            aria-label={`Hapus jadwal ${schedule.judul}`}
+                            className="grid h-9 min-w-16 place-items-center rounded-lg px-2 text-xs font-semibold text-bw-red transition-colors hover:bg-bw-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-red/40"
                           >
                             Hapus
                           </button>
@@ -559,6 +612,20 @@ export default function Dashboard() {
             );
           })}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(konfirmasiHapus)}
+        judul="Hapus jadwal?"
+        pesan={
+          konfirmasiHapus
+            ? `"${konfirmasiHapus.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
+            : ''
+        }
+        labelSetuju="Hapus"
+        sibuk={hapusBusy}
+        onBatal={() => setKonfirmasiHapus(null)}
+        onSetuju={() => konfirmasiHapus && handleHapus(konfirmasiHapus)}
+      />
     </div>
   );
 }

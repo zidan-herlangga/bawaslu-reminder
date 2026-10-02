@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
+import { usePresenceList } from '../lib/presenceContext';
 import fetchProfile from '../lib/fetchProfile';
 import {
   isSoundBusy,
@@ -67,6 +68,11 @@ export default function Akun() {
   const [pwMsg, setPwMsg] = useState(null);
 
   const reminder = useDueReminder([]);
+  // Presence dibaca dari provider yang dipasang di AppShell, bukan dijalankan
+  // di halaman ini. Kalau dijalankan di sini, channel ikut mati begitu pengguna
+  // pindah halaman dan daftar aktif langsung kosong.
+  const { daftar: aktif, terhubung: presenceTerhubung, jumlah: jumlahAktif } =
+    usePresenceList();
 
   useEffect(() => subscribeSound(setSoundOn), []);
   useEffect(() => subscribeSoundBusy(setSoundBusy), []);
@@ -231,7 +237,7 @@ export default function Akun() {
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-[15px] font-bold text-bw-ink">{nama}</p>
             <p className="truncate text-xs text-bw-muted">{session.user.email}</p>
-            <span className="mt-1 inline-block rounded-full bg-bw-red px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            <span className="mt-1 inline-block rounded-full bg-bw-red-solid px-2 py-0.5 text-xs font-bold text-white">
               {profile?.role_akses || 'Staf'}
             </span>
           </div>
@@ -343,6 +349,76 @@ export default function Akun() {
               </dd>
             </div>
           </dl>
+        )}
+      </section>
+
+      <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
+            Staf Aktif
+          </h2>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+              presenceTerhubung
+                ? 'bg-bw-green-50 text-bw-green-700'
+                : 'bg-bw-surface text-bw-muted'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                presenceTerhubung ? 'bg-bw-green-500' : 'bg-bw-muted'
+              }`}
+            />
+            {presenceTerhubung ? `${jumlahAktif} aktif` : 'Menyambung'}
+          </span>
+        </div>
+
+        {aktif.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-bw-line bg-bw-surface px-3.5 py-3 text-xs leading-relaxed text-bw-muted">
+            {presenceTerhubung
+              ? 'Belum ada staf lain yang membuka aplikasi saat ini.'
+              : 'Menyambung ke kanal realtime. Daftar muncul begitu tersambung.'}
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-bw-line">
+            {aktif.map((orang) => (
+              <li key={orang.id} className="flex items-center gap-3 py-2.5">
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                    orang.id === session?.user?.id
+                      ? 'bg-bw-blue-50 text-bw-blue-700'
+                      : 'bg-bw-green-50 text-bw-green-700'
+                  }`}
+                >
+                  {initialsOf(orang.nama)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-semibold text-bw-ink">
+                      {orang.nama}
+                    </span>
+                    {orang.id === session?.user?.id && (
+                      <span className="shrink-0 rounded-full bg-bw-blue-50 px-1.5 py-0.5 text-xs font-bold text-bw-blue-700">
+                        Kamu
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-bw-muted">
+                    {[orang.jabatan, orang.divisi].filter(Boolean).join(' - ') ||
+                      'Detail belum dilengkapi'}
+                  </span>
+                </span>
+                {orang.jumlahPerangkat > 1 && (
+                  <span
+                    className="shrink-0 rounded-full bg-bw-surface px-2 py-0.5 text-[10px] font-bold text-bw-muted"
+                    title={`${orang.jumlahPerangkat} tab terbuka`}
+                  >
+                    {orang.jumlahPerangkat} tab
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
@@ -501,7 +577,7 @@ export default function Akun() {
       </button>
 
       <p className="pb-2 text-center text-xs leading-relaxed text-bw-muted">
-        Aplikasi internal Bawaslu Kota Bekasi dengan akses terbatas.
+        Aplikasi internal Bawaslu Bekasi Kota dengan akses terbatas.
       </p>
     </div>
   );

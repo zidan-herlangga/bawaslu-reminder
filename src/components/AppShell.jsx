@@ -1,8 +1,10 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
+import { PresenceProvider } from '../lib/presenceContext';
 import ThemeToggle from './ThemeToggle';
 import useSession from '../hooks/useSession';
+import { useOnline } from '../hooks/useOnline';
 import { supabase } from '../lib/supabase';
 import { enablePush, ensurePushSubscription, isPushReady, notifyNow } from '../lib/push';
 import {
@@ -26,7 +28,7 @@ const NOTIF_POLL_MS = 15 * 1000;
 const NOTIF_POLL_SLOW_MS = 60 * 1000;
 
 const TOAST_TONE = {
-  error: 'bg-bw-red text-white ring-bw-red-100',
+  error: 'bg-bw-red-solid text-white ring-bw-red-100',
   success: 'bg-bw-solid text-bw-solid-text ring-bw-line',
   info: 'bg-bw-blue text-white ring-bw-blue-200',
 };
@@ -40,25 +42,6 @@ function formatLalu(iso) {
   const jam = Math.floor(menit / 60);
   if (jam < 24) return `${jam} jam lalu`;
   return `${Math.floor(jam / 24)} hari lalu`;
-}
-
-const MARQUEE_ITEMS = ['Bawaslu Kota Bekasi', 'Sistem Pengingat Jadwal'];
-const MARQUEE_HALF = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
-
-function MarqueeGroup({ decorative }) {
-  return (
-    <span
-      className="flex shrink-0 items-center"
-      aria-hidden={decorative ? 'true' : undefined}
-    >
-      {MARQUEE_HALF.map((item, index) => (
-        <span key={index} className="flex shrink-0 items-center whitespace-nowrap">
-          <span className="px-4">{item}</span>
-          <span className="h-1 w-1 shrink-0 rounded-full bg-bw-blue" />
-        </span>
-      ))}
-    </span>
-  );
 }
 
 function IconHome({ className }) {
@@ -201,6 +184,8 @@ export default function AppShell() {
   const [pushOn, setPushOn] = useState(() => isPushReady());
   const [pushBusy, setPushBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  const online = useOnline();
+  const onlineRef = useRef(online);
 
   const seenRef = useRef(new Set());
   const silencedRef = useRef(new Set());
@@ -210,11 +195,16 @@ export default function AppShell() {
   const showNav = Boolean(session) && inApp;
   const unread = notifs.filter((item) => !item.dibaca).length;
 
+  // Dipakai sebagai kunci efek realtime. Objek sesi berganti setiap kali
+  // Supabase menyegarkan token, jadi memakainya sebagai dependensi membuat
+  // kanal dibuat ulang terus-menerus.
+  const userId = session?.user?.id ?? null;
+
   useEffect(() => subscribeSound(setSoundOn), []);
   useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
   const loadNotifications = useCallback(async () => {
-    if (!session) return;
+    if (!userId) return;
     setNotifLoading(true);
     const { data, error } = await supabase
       .from('notifications')
@@ -263,10 +253,10 @@ export default function AppShell() {
         });
     }
     setNotifLoading(false);
-  }, [session]);
+  }, [userId]);
 
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setNotifs([]);
       setNotifOpen(false);
       primedRef.current = false;
@@ -299,14 +289,14 @@ export default function AppShell() {
     };
 
     const channel = supabase
-      .channel(`notifikasi-${session.user.id}`)
+      .channel(`notifikasi-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `penerima_id=eq.${session.user.id}`,
+          filter: `penerima_id=eq.${userId}`,
         },
         () => {
           proven = true;
@@ -329,7 +319,7 @@ export default function AppShell() {
       if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [session, loadNotifications]);
+  }, [userId, loadNotifications]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return undefined;
@@ -344,6 +334,18 @@ export default function AppShell() {
   }, []);
 
   useEffect(() => subscribeToast((item) => setToast(item)), []);
+
+  // Kabari begitu sinyal kembali, karena orang sering menunggu di halaman ini
+  // sambil mengira tombolnya tidak bisa dipakai lagi.
+  useEffect(() => {
+    // Toast hanya saat transisi mati -> online. Render pertama dilewati: saat
+    // itu ref sudah bernilai online, jadi tidak ada yang muncul setiap kali
+    // halaman dibuka.
+    if (onlineRef.current === false && online) {
+      showToast('Sinyal kembali. Perubahan bisa dikirim lagi.', 'success');
+    }
+    onlineRef.current = online;
+  }, [online]);
 
   useEffect(
     () =>
@@ -432,13 +434,11 @@ export default function AppShell() {
   return (
     <div className="flex min-h-dvh justify-center bg-bw-canvas">
       <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-bw-card shadow-card ring-1 ring-bw-line sm:max-w-[560px] md:max-w-[760px] lg:max-w-[860px]">
-        <div className="bw-marquee shrink-0 overflow-hidden bg-bw-solid py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-bw-solid-muted">
-          <span className="sr-only">
-            Bawaslu Kota Bekasi - Sistem Pengingat Jadwal
-          </span>
-          <div className="bw-marquee-track" aria-hidden="true">
-            <MarqueeGroup decorative />
-            <MarqueeGroup decorative />
+        <div className="shrink-0 overflow-hidden bg-bw-solid py-1.5">
+          <div className="flex items-center justify-center px-4">
+            <span className="truncate text-xs font-medium text-bw-solid-muted">
+              Bawaslu Bekasi Kota - Sistem Pengingat Jadwal
+            </span>
           </div>
         </div>
 
@@ -457,7 +457,7 @@ export default function AppShell() {
                   Pengingat Jadwal
                 </p>
                 <p className="truncate text-[11px] font-medium leading-tight text-bw-muted">
-                  Bawaslu Kota Bekasi
+                  Bawaslu Bekasi Kota
                 </p>
               </div>
             </div>
@@ -487,7 +487,7 @@ export default function AppShell() {
                   >
                     <IconBell className="h-[18px] w-[18px]" />
                     {unread > 0 && (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-bw-red px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-bw-card">
+                      <span className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-bw-red-solid px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-bw-card">
                         {unread > 9 ? '9+' : unread}
                       </span>
                     )}
@@ -555,7 +555,7 @@ export default function AppShell() {
                     type="button"
                     onClick={() => setNotifOpen(false)}
                     aria-label="Tutup notifikasi"
-                    className="grid h-6 w-6 place-items-center rounded text-bw-muted transition-colors hover:bg-bw-line hover:text-bw-ink focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+                    className="grid h-9 w-9 place-items-center rounded-full text-bw-muted transition-colors hover:bg-bw-surface hover:text-bw-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
                   >
                     <IconClose className="h-4 w-4" />
                   </button>
@@ -645,6 +645,33 @@ export default function AppShell() {
           )}
         </header>
 
+        {!online && (
+          <div
+            role="status"
+            className="flex shrink-0 items-center gap-2.5 border-b border-bw-amber-100 bg-bw-amber-50 px-4 py-2.5 text-xs font-medium text-bw-amber sm:px-5"
+          >
+            <svg
+              className="h-4 w-4 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M2 8.5a15 15 0 0 1 20 0" />
+              <path d="M5.5 12a10 10 0 0 1 13 0" />
+              <path d="M9 15.5a5 5 0 0 1 6 0" />
+              <path d="M12 19h.01" />
+              <path d="M3 3l18 18" strokeWidth="2" />
+            </svg>
+            <span>
+              Sinyal hilang. Jadwal yang tersimpan tetap aman, tapi perubahan baru belum bisa dikirim sampai koneksi kembali.
+            </span>
+          </div>
+        )}
+
         <main
           className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-bw-canvas px-4 sm:px-6 ${
             showNav ? 'pb-28 pt-4' : 'py-6'
@@ -673,11 +700,13 @@ export default function AppShell() {
             </div>
           )}
 
-          <ErrorBoundary key={location.pathname}>
-            <Suspense fallback={<PageSkeleton />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          <PresenceProvider session={session}>
+            <ErrorBoundary key={location.pathname}>
+              <Suspense fallback={<PageSkeleton />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </PresenceProvider>
         </main>
 
         {showNav && (

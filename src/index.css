@@ -16,6 +16,11 @@
   --bw-red: #d70015;
   --bw-red-50: #fdecee;
   --bw-red-100: #f9d8dd;
+  /* Merah pekat untuk isian yang di atasnya teks putih (tombol Hapus, badge).
+     Token --bw-red dipakai sebagai warna teks dan ikut menjadi merah terang di
+     mode gelap; kalau dipakai juga sebagai latar, teks putih di atasnya hanya
+     2,8:1. Nilai ini sengaja tidak berubah saat tema berganti. */
+  --bw-red-solid: #c10841;
 
   --bw-amber: #a85b00;
   --bw-amber-50: #fdf3e6;
@@ -132,6 +137,7 @@
   --color-bw-red: var(--bw-red);
   --color-bw-red-50: var(--bw-red-50);
   --color-bw-red-100: var(--bw-red-100);
+  --color-bw-red-solid: var(--bw-red-solid);
 
   --color-bw-amber: var(--bw-amber);
   --color-bw-amber-50: var(--bw-amber-50);
@@ -227,8 +233,11 @@
   }
 }
 
+/* Jarak aman perangkat. Dipakai max() supaya tidak bisa kalah dari kelas
+   padding biasa seperti pb-3: nilai di sini selalu minimal, dan tetap menambah
+   ruang pada perangkat yang punya home indicator. */
 @utility safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
 @utility safe-top {
@@ -265,37 +274,16 @@
   color: var(--bw-ink);
 }
 
-@keyframes bw-marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
-.bw-marquee-track {
+   lembaga yang sudah tercetak di title dan favicon, jadi gerakannya menarik
+   terbaca sekali glance dan tidak ada yang bergerak di tepi layar. */
   display: flex;
-  width: max-content;
-  animation: bw-marquee 22s linear infinite;
-  will-change: transform;
-}
+  justify-content: center;
 
-.bw-marquee:hover .bw-marquee-track {
-  animation-play-state: paused;
-}
-
-/* Semua gerak dihentikan kalau pengguna meminta reduced motion. */
 @media (prefers-reduced-motion: reduce) {
-  *,
   *::before,
-  *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
-}
 
 /* Kalau pengguna tidak ingin transparansi (dikentang di iOS dan Android),
    permukaan kaca diganti isian pekat supaya teks tetap terbaca dan
