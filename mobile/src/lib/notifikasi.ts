@@ -1,38 +1,107 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import {
+  alasanTidakDidukung,
+  notifikasiDidukung,
+} from '../shared/dukunganNotifikasi';
 
 // Notifikasi di aplikasi native.
 //
-// Catatan penting soal batasan, karena ini sering disalahpahami:
+// -------------------------------- batasan yang harus diketahui
 //
-// - Notifikasi LOKAL (dijadwalkan dari dalam aplikasi) tetap jalan di Expo Go.
-//   Ini dipakai untuk pengingat yang dibuat di perangkat itu sendiri
-// - Notifikasi REMOTE (dikirim dari server) TIDAK jalan di Expo Go sejak SDK 53.
-//   Membutuhkannya development build plus kredensial push
+// Dua jenis notifikasi ada, dan bedanya menentukan seluruh isi berkas ini:
 //
-// Jadi untuk tahap sekarang, yang bisa diuji tanpa kredensial apa pun adalah
-// notifikasi lokal. Pengiriman dari server menyusul setelah ada development
-// build.
+// - Notifikasi LOKAL (dijadwalkan di perangkat sendiri)
+// - Notifikasi REMOTE (dikirim dari server)
 //
-// Channel Android dibuat lebih awal supaya pengingat yang masuk tidak
-// fingernal dengan suara default sistem saat aplikasi belum pernah dibuka
-// sebelumnya.
+// Keduanya hilang di Expo Go Android, dan itu bukan pilihan desain:
+// paket expo-notifications melempar galat tepat saat modulnya dimuat. Di dalam
+// paket itu begini:
+//
+//   if (isRunningInExpoGo() && !didWarn) {
+//     if (Platform.OS === 'android') throw new Error(...);
+//     else if (__DEV__) console.warn(...);
+//   }
+//
+// Pemanggilnya ada di lingkup modul, lewat DevicePushTokenAutoRegistration.
+// Jadi bukan hanya push yang mati: begitu `expo-notifications` diimpor di
+// Expo Go Android, modul itu meledak sebelum satu pun API-nya sempat dipanggil.
+//
+// Di iOS Expo Go hanya muncul peringatan, jadi notifikasi lokal masih jalan.
+//
+// Karena itu modul ini TIDAK pernah diimpor secara statis. Impor statis akan
+// menjalankan modul begitu berkas ini sendiri diimpor, dan itu cukup untuk
+// membuat seluruh aplikasi gagal. Impor-nya dilakukan malas, di dalam fungsi,
+// dan hanya kalau lingkungan ini memang mengizinkan.
+//
+// Setelah ini, remote push tetap butuh development build. Itu tidak bisa
+// dihindari dari sisi kode.
 
-function pesanGalat(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  return String(error);
+// 'storeClient' berarti aplikasi dijalankan dari Expo Go.
+function diExpoGo(): boolean {
+  return Constants.executionEnvironment === 'storeClient';
 }
+
+/**
+ * True kalau notifikasi boleh dipakai di lingkungan sekarang. Aturannya
+ * diambil dari shared/dukunganNotifikasi supaya bisa diuji tanpa perangkat,
+ * dan tidak ada dua versi kebenaran.
+ */
+export function notifikasiBisaDipakai(): boolean {
+  return notifikasiDidukung(Platform.OS, diExpoGo());
+}
+
+/** Penjelasan singkat kalau lingkungan ini memang tidak mendukung. */
+export function alasanTidakBisaDipakai(): string | null {
+  return alasanTidakDidukung(Platform.OS, diExpoGo());
+}
+
+export type StatusNotifikasi = 'siap' | 'ekspo-go' | 'belum' | 'ya' | 'tidak';
 
 const KANAL_REMINDER = 'pengingat-jadwal';
 const KANAL_TUGAS = 'tugas';
 
+type ModulNotifikasi = typeof import('expo-notifications');
+
+let modul: ModulNotifikasi | null = null;
+let gagalMuat = false;
+
+/**
+ * Memuat expo-notifications secara malas.
+ *
+ * Mengembalikan null kalau lingkungan ini tidak mendukungnya, sehingga
+ * pemanggil bisa melewatkannya tanpa try/catch di setiap tempat.
+ */
+async function muatModul(): Promise<ModulNotifikasi | null> {
+  if (!notifikasiBisaDipakai()) return null;
+  if (modul) return modul;
+  if (gagalMuat) return null;
+
+  try {
+    modul = await import('expo-notifications');
+    return modul;
+  } catch (kesalahan) {
+    gagalMuat = true;
+    console.warn(
+      '[notifikasi] modul tidak bisa dimuat:',
+      kesalahan instanceof Error ? kesalahan.message : kesalahan
+    );
+    return null;
+  }
+}
+
 let channelSiap: Promise<void> | null = null;
 
-/** Membuat channel Android. Di iOS tidak ada channel, notifikasi selalu tampil. */
-export function siapkanChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return Promise.resolve();
-  if (channelSiap) return channelSiap;
+/** Membuat channel Android. Di iOS tidak ada channel. */
+export async function siapkanChannel(): Promise<boolean> {
+  const Notifications = await muatModul();
+  if (!Notifications) return false;
+
+  if (Platform.OS !== 'android') return true;
+  if (channelSiap) {
+    await channelSiap;
+    return true;
+  }
 
   channelSiap = (async () => {
     await Notifications.setNotificationChannelAsync(KANAL_REMINDER, {
@@ -49,16 +118,28 @@ export function siapkanChannel(): Promise<void> {
       lightColor: '#1f9d55',
       sound: 'default',
     });
-  })().catch((error) => {
-    console.warn('[notifikasi] gagal membuat channel:', pesanGalat(error));
+  })().catch((kesalahan) => {
+    channelSiap = null;
+    console.warn(
+      '[notifikasi] gagal membuat channel:',
+      kesalahan instanceof Error ? kesalahan.message : kesalahan
+    );
   });
 
-  return channelSiap;
+  await channelSiap;
+  return true;
 }
 
-export type IzinNotifikasi = 'belum' | 'ya' | 'tidak';
+/**
+ * Status izin notifikasi. `ekspo-go` berarti lingkungan ini memang tidak
+ * mendukung notifikasi, bukan bahwa izinnya ditolak.
+ */
+export async function cekIzinNotifikasi(): Promise<StatusNotifikasi> {
+  if (!notifikasiBisaDipakai()) return 'ekspo-go';
 
-export async function cekIzinNotifikasi(): Promise<IzinNotifikasi> {
+  const Notifications = await muatModul();
+  if (!Notifications) return 'ekspo-go';
+
   try {
     const { status, canAskAgain } = await Notifications.getPermissionsAsync();
     if (status === 'granted') return 'ya';
@@ -73,10 +154,14 @@ export async function cekIzinNotifikasi(): Promise<IzinNotifikasi> {
  * saat tombol ditekan: di Android, permintaan di luar gestur tidak akan
  * menampilkan dialog.
  */
-export async function mintaIzinNotifikasi(): Promise<IzinNotifikasi> {
+export async function mintaIzinNotifikasi(): Promise<StatusNotifikasi> {
+  if (!notifikasiBisaDipakai()) return 'ekspo-go';
+
+  const Notifications = await muatModul();
+  if (!Notifications) return 'ekspo-go';
+
   try {
     const sekarang = await Notifications.getPermissionsAsync();
-
     if (sekarang.granted) return 'ya';
 
     const hasil = await Notifications.requestPermissionsAsync();
@@ -86,8 +171,11 @@ export async function mintaIzinNotifikasi(): Promise<IzinNotifikasi> {
     }
 
     return hasil.canAskAgain ? 'belum' : 'tidak';
-  } catch (error) {
-    console.warn('[notifikasi] gagal meminta izin:', pesanGalat(error));
+  } catch (kesalahan) {
+    console.warn(
+      '[notifikasi] gagal meminta izin:',
+      kesalahan instanceof Error ? kesalahan.message : kesalahan
+    );
     return 'belum';
   }
 }
@@ -95,70 +183,79 @@ export async function mintaIzinNotifikasi(): Promise<IzinNotifikasi> {
 export interface JadwalPengingat {
   judul: string;
   isi: string;
-  /** ISO waktu mulai jadwal yang dao-ingatkan. */
+  /** ISO waktu mulai yang akan diingatkan. */
   mulaiIso: string;
-  selesaiIso?: string | null;
   jadwalId: string;
 }
 
 /**
- * Menampilkan pengingat sebagai notifikasi lokal.
+ * Menjadwalkan pengingat sebagai notifikasi lokal.
  *
- * Hanya dipakai untuk menguji alur notifikasi tanpa server. Pengiriman sungguhan
- * ke semua staf dilakukan lewat endpoint push yang sudah ada di aplikasi web.
+ * Dipakai untuk menguji alur notifikasi tanpa server. Kalau lingkungannya
+ * tidak mendukung, mengembalikan false supaya pemanggil bisa memberi tahu
+ * pengguna alih-alih diam saja.
  */
-export async function ingatkanSekarang(pengingat: JadwalPengingat): Promise<void> {
-  await siapkanChannel();
+export async function ingatkanSekarang(
+  pengingat: JadwalPengingat
+): Promise<boolean> {
+  const Notifications = await muatModul();
+  if (!Notifications) return false;
+
+  const siap = await siapkanChannel();
+  if (!siap) return false;
 
   const mulai = new Date(pengingat.mulaiIso).getTime();
-  const selesai = pengingat.selesaiIso
-    ? new Date(pengingat.selesaiIso).getTime()
-    : null;
+  const kapan = new Date(mulai > Date.now() ? mulai : Date.now() + 1000);
 
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: pengingat.judul,
-      body: pengingat.isi,
-      data: { jadwal_id: pengingat.jadwalId },
-      sound: 'default',
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(Math.min(mulai, Date.now() + 1000)),
-      channelId: Platform.OS === 'android' ? KANAL_REMINDER : undefined,
-    },
-  });
-
-  // Android 12 ke atas memakai exacta alarm untuk notifikasi yang perlu tepat
-  // waktu. Izin ini hanya diminta kalau pengingat dijadwalkan ke masa depan.
-  if (Platform.OS === 'android' && mulai > Date.now()) {
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Segera',
-          body: pengingat.isi,
-          data: { jadwal_id: pengingat.jadwalId },
-          sound: 'default',
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: new Date(mulai),
-          channelId: KANAL_REMINDER,
-        },
-      });
-    } catch (error) {
-      console.warn('[notifikasi] jadwal ulang gagal:', pesanGalat(error));
-    }
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: pengingat.judul,
+        body: pengingat.isi,
+        data: { jadwal_id: pengingat.jadwalId },
+        sound: 'default',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: kapan,
+        channelId: Platform.OS === 'android' ? KANAL_REMINDER : undefined,
+      },
+    });
+    return true;
+  } catch (kesalahan) {
+    console.warn(
+      '[notifikasi] gagal menjadwalkan:',
+      kesalahan instanceof Error ? kesalahan.message : kesalahan
+    );
+    return false;
   }
-
-  void selesai;
 }
 
-/** Membatalkan semua pengingat yang terjadwal, dipakai saat keluar dari akun. */
+/** Membatalkan semua pengingat yang terjadwal. */
 export async function batalkanSemua(): Promise<void> {
+  const Notifications = await muatModul();
+  if (!Notifications) return;
+
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch (error) {
-    console.warn('[notifikasi] gagal membatalkan pengingat:', pesanGalat(error));
+  } catch (kesalahan) {
+    console.warn(
+      '[notifikasi] gagal membatalkan pengingat:',
+      kesalahan instanceof Error ? kesalahan.message : kesalahan
+    );
+  }
+}
+
+/** Pesan yang jujur untuk ditampilkan di layar Akun. */
+export function pesanStatus(status: StatusNotifikasi): string {
+  switch (status) {
+    case 'ya':
+      return 'Diizinkan';
+    case 'tidak':
+      return 'Ditolak';
+    case 'ekspo-go':
+      return 'Tidak tersedia di Expo Go';
+    default:
+      return 'Belum diminta';
   }
 }

@@ -6,7 +6,13 @@ import { showToast } from '../../lib/toast';
 import { useSesi } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { useTema, type PilihanTema } from '../../tema/TemaProvider';
-import { mintaIzinNotifikasi } from '../../lib/notifikasi';
+import {
+  cekIzinNotifikasi,
+  mintaIzinNotifikasi,
+  pesanStatus,
+  type StatusNotifikasi,
+} from '../../lib/notifikasi';
+import { alasanTidakBisaDipakai } from '../../lib/notifikasi';
 
 // Akun: profil, tema, dan notifikasi.
 //
@@ -27,7 +33,7 @@ export default function LayarAkun() {
   const { pilihan, setPilihan } = useTema();
 
   const [profil, setProfil] = useState<Profil | null>(null);
-  const [izinNotifikasi, setIzinNotifikasi] = useState<'belum' | 'ya' | 'tidak'>('belum');
+  const [izinNotifikasi, setIzinNotifikasi] = useState<StatusNotifikasi>('belum');
 
   useEffect(() => {
     if (!session) return;
@@ -47,12 +53,23 @@ export default function LayarAkun() {
   }, [session]);
 
   useEffect(() => {
-    void cekIzinNotifikasi(setIzinNotifikasi);
+    // Memakai fungsi dari lib/notifikasi, bukan pemeriksaan sendiri di sini.
+    // Fungsi itu tahu kapan lingkungan ini tidak mendukung notifikasi, sehingga
+    // tidak pernah menyentuh expo-notifications di Expo Go Android.
+    void cekIzinNotifikasi().then(setIzinNotifikasi);
   }, []);
 
   const mintaIzin = useCallback(async () => {
     const hasil = await mintaIzinNotifikasi();
     setIzinNotifikasi(hasil);
+
+    if (hasil === 'ekspo-go') {
+      showToast(
+        'Notifikasi butuh development build. Di Expo Go bagian ini tidak tersedia.',
+        'info'
+      );
+      return;
+    }
 
     if (hasil === 'tidak') {
       showToast(
@@ -120,18 +137,14 @@ export default function LayarAkun() {
           <Baris
             ikon="notifications-outline"
             judul="Izin notifikasi"
-            keterangan={
-              izinNotifikasi === 'ya'
-                ? 'Diizinkan'
-                : izinNotifikasi === 'tidak'
-                  ? 'Ditolak'
-                  : 'Belum diminta'
-            }
-            onTekan={mintaIzin}
+            keterangan={pesanStatus(izinNotifikasi)}
+            onTekan={izinNotifikasi === 'ekspo-go' ? undefined : mintaIzin}
           />
           <Text className="mt-2 text-xs leading-relaxed text-bw-muted">
-            Izin hanya diminta satu kali. Menolaknya berarti pengingat tidak akan
-            sampai saat aplikasi ditutup.
+            {izinNotifikasi === 'ekspo-go'
+              ? alasanTidakBisaDipakai() ??
+                'Notifikasi tidak tersedia di lingkungan ini.'
+              : 'Izin hanya diminta satu kali. Menolaknya berarti pengingat tidak akan sampai saat aplikasi ditutup.'}
           </Text>
         </Bagian>
 
@@ -253,16 +266,3 @@ function inisial(nama: string | null | undefined): string {
   return bagian.map((kata) => kata.charAt(0).toUpperCase()).join('');
 }
 
-async function cekIzinNotifikasi(
-  ubah: (nilai: 'belum' | 'ya' | 'tidak') => void
-): Promise<void> {
-  try {
-    const modul = await import('expo-notifications');
-    const status = await modul.getPermissionsAsync();
-    ubah(
-      status.granted ? 'ya' : status.canAskAgain === false ? 'tidak' : 'belum'
-    );
-  } catch {
-    ubah('belum');
-  }
-}

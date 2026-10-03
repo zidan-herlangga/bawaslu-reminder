@@ -66,10 +66,24 @@ dengan syarat generate-tema selalu dijalankan sebelum commit.
 
 Dua jenis, dan bedanya penting.
 
-| Jenis | Sumber | Expo Go |
-| --- | --- | --- |
-| Lokal | Dijadwalkan di perangkat | Berjalan |
-| Remote | Dikirim dari server | **Tidak berjalan** |
+| Jenis | Sumber | Expo Go Android | Expo Go iOS | Development build |
+| --- | --- | --- | --- | --- |
+| Lokal | Dijadwalkan di perangkat | Tidak berjalan | Berjalan | Berjalan |
+| Remote | Dikirim dari server | Tidak berjalan | Terbatas | Berjalan |
+
+Perbedaannya lebih besar dari yang biasa disebut orang. Di Expo Go Android,
+`expo-notifications` **melempar galat begitu modulnya diimpor**, bukan hanya
+saat push dipakai. Jadi bukan cuma push yang mati: notifikasi lokal ikut mati
+karena keduanya butuh modul yang sama.
+
+Akibatnya `src/lib/notifikasi.ts` tidak pernah mengimpor modul itu secara
+statis. Imornya dilakukan malas di dalam fungsi, dan hanya kalau lingkungan ini
+memang mengizinkan. Di Expo Go Android jalur itu tidak pernah dimasuki, sehingga
+aplikasi tidak meledak. Layar Akun menampilkan "Tidak tersedia di Expo Go"
+supaya tidak terlihat seperti kesalahan.
+
+Aturan memutuskan ini ada di `src/shared/dukunganNotifikasi.ts` dan diuji, bukan
+ditulis langsung di dalam modul notifikasi.
 
 Notifikasi remote butuh development build, dan sudah dihapus dari Expo Go sejak
 SDK 53.Itu bagian yang paling sering membuat orang salah langkah: kode
