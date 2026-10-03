@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { subscribeToast, type NadaToast, type PesanToast } from '../lib/toast';
+
+/**
+ * Apakah animasi boleh memakai driver native.
+ *
+ * Di web modul animasi native tidak ada sama sekali. Dengan useNativeDriver
+ * selalu true, React Native mencetak peringatan lalu jatuh ke driver JS.
+ * Bertanya Platform.OS menghapus peringatan itu tanpa mengubah hasil:
+ * animasi tetap berjalan, dan di native tetap berjalan di thread UI.
+ */
+const PAKAI_DRIVER_NATIVE = Platform.OS !== 'web';
+
 import type { TokenWarna } from '../tema/warna';
 import { Ikon, type NamaIkon } from './Ikon';
 
@@ -60,7 +71,7 @@ export function ToastHost() {
     Animated.timing(anim, {
       toValue: 0,
       duration: 180,
-      useNativeDriver: true,
+      useNativeDriver: PAKAI_DRIVER_NATIVE,
     }).start(({ finished }) => {
       // Tidak selesai berarti ada toast baru yang menyela, jangan dikosongkan.
       if (finished) setItem(null);
@@ -75,7 +86,7 @@ export function ToastHost() {
       Animated.timing(anim, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: PAKAI_DRIVER_NATIVE,
       }).start();
       timer.current = setTimeout(tutup, DURASI[baru.nada]);
     });

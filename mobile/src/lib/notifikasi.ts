@@ -200,18 +200,34 @@ export async function bukaPengaturanSistem(): Promise<void> {
  * Mendaftarkan perangkat ini ke tabel device_tokens supaya server bisa
  * mengirim push lewat FCM atau APNs.
  *
- * Mengembalikan false di Expo Go Android adalah hal yang wajar, bukan kesalahan:
- * token tidak bisa diambil karena paketnya tidak tersedia di sana. Yang penting
- * pemanggil tidak menganggapnya gagal dan tidak mencoba terus-menerus.
+ * Hanya untuk native. Di web, push ditangani PWA sendiri lewat service
+ * worker dan tabel push_subscriptions, dan token yang dipakai adalah token
+ * browser, bukan FCM atau APNs. Menuliskan token browser ke device_tokens
+ * akan menghasilkan baris yang tidak pernah bisa dikirimi.
+ *
+ * Penjaga di notifikasiBisaDipakai() tidak bisa dipakai di sini: dia
+ * mengembalikan true di web, karena notifikasi lokal di web memang tidak
+ * salah apa pun. Tapi getDevicePushTokenAsync di web melempar galat
+ *
+ *   You must provide `notification.vapidPublicKey` in `app.json`
+ *
+ * Pola yang sama seperti yang sudah kita dealing di expo-notifications:
+ * pesan teknis yang tidak menjelaskan apa pun ke pengguna.
+ *
+ * Mengembalikan false di sini bukan kesalahan. Pemanggil tidak perlu tahu
+ * alasannya, dan tidak perlu mencoba lagi.
  */
 export async function daftarTokenPush(userId: string): Promise<boolean> {
+  // Web pakai jalur push-nya sendiri. Lihat catatan panjang di atas.
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return false;
+
   const Notifications = await muatModul();
   if (!Notifications) return false;
 
   try {
     await siapkanChannel();
 
-    // TokenExpo hanya tersedia di development build. Di Expo Go, jalur ini
+    // Token perangkat hanya ada di development build. Di Expo Go, jalur ini
     // sudah berhenti di atas, jadi tidak perlu penanganan terpisah.
     const perangkat = await Notifications.getDevicePushTokenAsync();
     const token = perangkat.data;

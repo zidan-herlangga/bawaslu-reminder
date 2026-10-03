@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePengingat, type Pengingat } from '../lib/pengingat';
 import { useSesi } from '../lib/session';
+
+/**
+ * Apakah animasi boleh memakai driver native.
+ *
+ * Di web modul animasi native tidak ada sama sekali. Dengan useNativeDriver
+ * selalu true, React Native mencetak peringatan lalu jatuh ke driver JS.
+ * Bertanya Platform.OS menghapus peringatan itu tanpa mengubah hasil:
+ * animasi tetap berjalan, dan di native tetap berjalan di thread UI.
+ */
+const PAKAI_DRIVER_NATIVE = Platform.OS !== 'web';
+
 import { Ikon } from './Ikon';
 
 // Banner pengingat di dalam aplikasi.
@@ -36,7 +47,7 @@ function BarisPengingat({
     Animated.timing(geser, {
       toValue: 1,
       duration: 220,
-      useNativeDriver: true,
+      useNativeDriver: PAKAI_DRIVER_NATIVE,
     }).start();
   }, [geser]);
 
@@ -45,7 +56,7 @@ function BarisPengingat({
     Animated.timing(geser, {
       toValue: 0,
       duration: 160,
-      useNativeDriver: true,
+      useNativeDriver: PAKAI_DRIVER_NATIVE,
     }).start(({ finished }) => {
       // onTutup hanya dipanggil kalau animasi selesai. Kalau tidak, banner
       // disembunyikan lewat state tapi kuncinya tetap tertahan, sehingga sesi
