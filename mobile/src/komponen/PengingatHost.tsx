@@ -103,8 +103,10 @@ export function PengingatHost() {
 
   return (
     <View
-      pointerEvents="box-none"
-      style={{ paddingBottom: insets.bottom + 8 }}
+      // pointerEvents lewat style, bukan sebagai prop terpisah. React Native
+      // 0.86 sudah meng deprecated prop pointerEvents;-memberikannya sebagai
+      // gaya menghasilkan perilaku yang sama tanpa peringatan.
+      style={{ pointerEvents: 'box-none', paddingBottom: insets.bottom + 8 }}
       className="absolute inset-x-0 bottom-0 px-3"
     >
       {pengingat.map((item) => (

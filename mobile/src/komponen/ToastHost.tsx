@@ -92,9 +92,10 @@ export function ToastHost() {
 
   return (
     <View
-      pointerEvents="box-none"
+      // pointerEvents lewat style, bukan prop terpisah: React Native 0.86 sudah
+      // meng deprecated prop pointerEvents.
       className="absolute inset-x-0 top-0 px-4"
-      style={{ paddingTop: insets.top + 8 }}
+      style={{ pointerEvents: 'box-none', paddingTop: insets.top + 8 }}
     >
       <Animated.View
         style={{

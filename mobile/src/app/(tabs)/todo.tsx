@@ -131,7 +131,7 @@ export default function LayarTugas() {
     try {
       const { error } = await supabase
         .from('todos')
-        .insert({ teks: isi, selesai: false, user_id: userId });
+        .insert({ pemilik_id: userId, teks: isi, selesai: false });
 
       if (error) {
         showToast(`Gagal menambah: ${error.message}`, 'galat');
