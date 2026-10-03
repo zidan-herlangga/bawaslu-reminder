@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { useSesi } from '../../lib/session';
@@ -175,6 +176,91 @@ export default function LayarTugas() {
     [userId]
   );
 
+
+  // Id tugas yang sedang diedit, kosong berarti tidak ada edit yang berjalan.
+  const [editId, setEditId] = useState('');
+  const [editDraf, setEditDraf] = useState('');
+
+  // Tugas yang sedang menunggu persetujuan hapus.
+  const [hapusTarget, setHapusTarget] = useState<Todo | null>(null);
+  const [hapusSibuk, setHapusSibuk] = useState(false);
+
+  const mulaiEdit = useCallback((todo: Todo) => {
+    setEditId(todo.id);
+    setEditDraf(todo.teks);
+  }, []);
+
+  const batalEdit = useCallback(() => {
+    setEditId('');
+    setEditDraf('');
+  }, []);
+
+  const simpanEdit = useCallback(async () => {
+    const isi = editDraf.trim();
+    if (!editId || !isi) return;
+
+    const id = editId;
+    const sebelum = daftar.find((item) => item.id === id);
+
+    // Terapkan di layar lebih dulu supaya terasa cepat, lalu cocokkan dengan
+    // jawaban server. Kalau gagal, kembalikan seperti semula.
+    setDaftar((lama) =>
+      lama.map((item) => (item.id === id ? { ...item, teks: isi } : item))
+    );
+    batalEdit();
+
+    const { error } = await supabase
+      .from('todos')
+      .update({ teks: isi })
+      .eq('id', id);
+
+    if (error) {
+      if (sebelum) {
+        setDaftar((lama) =>
+          lama.map((item) => (item.id === id ? sebelum : item))
+        );
+      }
+      showToast('Gagal menyimpan perubahan: ' + error.message, 'galat');
+      return;
+    }
+
+    showToast('Tugas diperbarui.', 'sukses');
+  }, [editId, editDraf, daftar, batalEdit]);
+
+  const hapus = useCallback(async () => {
+    if (!hapusTarget) return;
+
+    const target = hapusTarget;
+    setHapusSibuk(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('todos')
+        .delete()
+        .eq('id', target.id)
+        .select('id');
+
+      if (error) {
+        showToast('Gagal menghapus: ' + error.message, 'galat');
+        return;
+      }
+
+      // RLS membuat delete diam-diam tidak menghapus apa pun kalau policy-nya
+      // tidak cocok. Tanpa pemeriksaan ini, layar akan menampilkan tugas hilang
+      // padahal di server masih ada, lalu muncul lagi saat dimuat ulang.
+      if (!data?.length) {
+        showToast('Tugas tidak terhapus. Periksa aturan RLS di schema.sql.', 'galat');
+        return;
+      }
+
+      setDaftar((lama) => lama.filter((item) => item.id !== target.id));
+      showToast('Tugas dihapus.', 'sukses');
+      setHapusTarget(null);
+    } finally {
+      setHapusSibuk(false);
+    }
+  }, [hapusTarget]);
+
   const belum = daftar.filter((item) => !item.selesai);
   const sudah = daftar.filter((item) => item.selesai);
   const persen = daftar.length > 0 ? Math.round((sudah.length / daftar.length) * 100) : 0;
@@ -322,7 +408,18 @@ export default function LayarTugas() {
             </Text>
             <View className="gap-2.5">
               {belum.map((todo) => (
-                <BarisTugas key={todo.id} todo={todo} onAlih={alihkan} />
+                <BarisTugas
+                  key={todo.id}
+                  todo={todo}
+                  onAlih={alihkan}
+                  sedangEdit={editId === todo.id}
+                  draf={editDraf}
+                  onUbahDraf={setEditDraf}
+                  onMulaiEdit={mulaiEdit}
+                  onBatalEdit={batalEdit}
+                  onSimpanEdit={simpanEdit}
+                  onHapus={() => setHapusTarget(todo)}
+                />
               ))}
             </View>
           </View>
@@ -336,12 +433,36 @@ export default function LayarTugas() {
             </Text>
             <View className="gap-2.5">
               {sudah.map((todo) => (
-                <BarisTugas key={todo.id} todo={todo} onAlih={alihkan} />
+                <BarisTugas
+                  key={todo.id}
+                  todo={todo}
+                  onAlih={alihkan}
+                  sedangEdit={editId === todo.id}
+                  draf={editDraf}
+                  onUbahDraf={setEditDraf}
+                  onMulaiEdit={mulaiEdit}
+                  onBatalEdit={batalEdit}
+                  onSimpanEdit={simpanEdit}
+                  onHapus={() => setHapusTarget(todo)}
+                />
               ))}
             </View>
           </View>
         ) : null}
       </ScrollView>
+
+        <DialogKonfirmasi
+          terbuka={Boolean(hapusTarget)}
+          judul="Hapus tugas?"
+          pesan={
+            hapusTarget
+              ? '"' + hapusTarget.teks + '" akan dihapus. Tindakan ini tidak bisa dibatalkan.'
+              : ''
+          }
+          sibuk={hapusSibuk}
+          onBatal={() => setHapusTarget(null)}
+          onSetuju={hapus}
+        />
     </SafeAreaView>
   );
 }
@@ -349,48 +470,175 @@ export default function LayarTugas() {
 function BarisTugas({
   todo,
   onAlih,
+  sedangEdit,
+  draf,
+  onUbahDraf,
+  onMulaiEdit,
+  onBatalEdit,
+  onSimpanEdit,
+  onHapus,
 }: {
   todo: Todo;
   onAlih: (todo: Todo) => void;
+  sedangEdit: boolean;
+  draf: string;
+  onUbahDraf: (nilai: string) => void;
+  onMulaiEdit: (todo: Todo) => void;
+  onBatalEdit: () => void;
+  onSimpanEdit: () => void;
+  onHapus: () => void;
 }) {
+  const [menuTerbuka, setMenuTerbuka] = useState(false);
+
+  // Mode edit mengganti seluruh isi baris dengan kolom teks. Menu sebaris membuat
+  // satu langkah lebih sedikit daripada dialog kedua: tugas ini milik satu
+  // orang, teksnya pendek, dan tidak ada yang perlu diisi selain teks.
+  if (sedangEdit) {
+    return (
+      <View className="rounded-3xl border border-bw-blue bg-bw-card p-3.5">
+        <TextInput
+          value={draf}
+          onChangeText={onUbahDraf}
+          autoFocus
+          multiline
+          accessibilityLabel="Ubah teks tugas"
+          placeholder="Ubah teks tugas"
+          placeholderTextColor="#8e8e93"
+          className="min-h-20 rounded-2xl border border-bw-line bg-bw-surface px-3.5 py-3 text-[15px] text-bw-ink"
+        />
+
+        <View className="mt-2.5 flex-row gap-2">
+          <TombolAksi
+            label="Batal"
+            ikon="close"
+            onPress={onBatalEdit}
+            className="flex-1 border border-bw-line bg-bw-surface"
+          />
+          <TombolAksi
+            label="Simpan"
+            ikon="checkmark"
+            onPress={onSimpanEdit}
+            nonaktif={draf.trim().length === 0}
+            className="flex-1 bg-bw-blue"
+            teksPutih
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <Pressable
-      onPress={() => onAlih(todo)}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: todo.selesai }}
-      accessibilityLabel={todo.teks}
-      android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
-      className={`min-h-16 flex-row items-center gap-3.5 rounded-3xl border border-bw-line bg-bw-card px-4 py-3.5 active:opacity-70 ${
+    <View
+      className={`min-h-16 flex-row items-center gap-3.5 rounded-3xl border border-bw-line bg-bw-card px-4 py-3.5 ${
         todo.selesai ? 'opacity-70' : ''
       }`}
     >
-      <View
-        className={`h-8 w-8 items-center justify-center rounded-full border-2 ${
-          todo.selesai ? 'border-bw-green bg-bw-green' : 'border-bw-line bg-transparent'
-        }`}
+      <Pressable
+        onPress={() => onAlih(todo)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: todo.selesai }}
+        accessibilityLabel={todo.teks}
+        android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+        className="min-w-0 flex-1 flex-row items-center gap-3.5"
       >
-        {todo.selesai ? (
-          <Ikon nama="checkmark" ukuran={18} token="bw-green-50" />
-        ) : null}
-      </View>
-
-      <View className="min-w-0 flex-1">
-        <Text
-          className={
+        <View
+          className={`h-8 w-8 items-center justify-center rounded-full border-2 ${
             todo.selesai
-              ? 'text-[15px] text-bw-muted line-through'
-              : 'text-[15px] font-semibold text-bw-ink'
-          }
+              ? 'border-bw-green bg-bw-green'
+              : 'border-bw-line bg-transparent'
+          }`}
         >
-          {todo.teks}
-        </Text>
-        {todo.tanggal ? (
-          <View className="mt-1 flex-row items-center gap-1">
-            <Ikon nama="calendar-outline" token="bw-muted" ukuran={12} />
-            <Text className="text-xs text-bw-muted">{todo.tanggal}</Text>
-          </View>
-        ) : null}
-      </View>
+          {todo.selesai ? (
+            <Ikon nama="checkmark" ukuran={18} token="bw-green-50" />
+          ) : null}
+        </View>
+
+        <View className="min-w-0 flex-1">
+          <Text
+            className={
+              todo.selesai
+                ? 'text-[15px] text-bw-muted line-through'
+                : 'text-[15px] font-semibold text-bw-ink'
+            }
+          >
+            {todo.teks}
+          </Text>
+          {todo.tanggal ? (
+            <View className="mt-1 flex-row items-center gap-1">
+              <Ikon nama="calendar-outline" token="bw-muted" ukuran={12} />
+              <Text className="text-xs text-bw-muted">{todo.tanggal}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+
+      {menuTerbuka ? (
+        <View className="flex-row gap-2">
+          <TombolAksi
+            label="Ubah"
+            ikon="create-outline"
+            onPress={() => {
+              setMenuTerbuka(false);
+              onMulaiEdit(todo);
+            }}
+            className="border border-bw-line bg-bw-surface"
+          />
+          <TombolAksi
+            label="Hapus"
+            ikon="trash-outline"
+            onPress={() => {
+              setMenuTerbuka(false);
+              onHapus();
+            }}
+            className="border border-bw-red-100 bg-bw-red-50"
+          />
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => setMenuTerbuka(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ubah atau hapus tugas ${todo.teks}`}
+          hitSlop={8}
+          className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+        >
+          <Ikon nama="ellipsis-horizontal" token="bw-muted" ukuran={20} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function TombolAksi({
+  label,
+  ikon,
+  onPress,
+  className,
+  nonaktif = false,
+  teksPutih = false,
+}: {
+  label: string;
+  ikon: Parameters<typeof Ikon>[0]['nama'];
+  onPress: () => void;
+  className: string;
+  nonaktif?: boolean;
+  teksPutih?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={nonaktif}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className={`h-11 flex-row items-center justify-center gap-1.5 rounded-2xl px-3.5 active:opacity-80 ${
+        className
+      } ${nonaktif ? 'opacity-50' : ''}`}
+    >
+      <Ikon nama={ikon} ukuran={15} token={teksPutih ? 'bw-blue-50' : 'bw-ink-2'} />
+      <Text
+        className={`text-sm font-bold ${teksPutih ? 'text-white' : 'text-bw-ink-2'}`}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,19 +11,23 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BidangAuth, KotakPesan } from '../komponen/BidangAuth';
 import { Ikon } from '../komponen/Ikon';
 import { useSesi } from '../lib/session';
 
 // Layar masuk.
 //
-// Dua hal yang disengaja:
+// Tiga hal yang disengaja:
 //
-// - Tidak ada tombol "Daftar" atau "Lupa kata sandi". Di web keduanya perlu
-//   karena Supabase mengirim tautan yang dibuka di peramban. Di native tautan
-//   itu ditangani sistem lewat deep link, jadi tidak perlu layar sendiri
-// - Galat ditampilkan tepat di atas tombol, bukan di tempat yang jauh. Kesalahan
-//   paling sering terjadi di sini adalah email atau kata sandi yang salah, dan
-//   pesannya perlu dibaca sebelum orang mencoba lagi
+// - Ada tombol Daftar dan Lupa kata sandi. Keduanya berujung pada tautan
+//   dari email yang ditangani sistem lewat deep link, jadi tetap butuh
+//   layar sendiri: tautan itu harus mendarat di halaman yang bisa menerima
+//   sesi pemulihan.
+// - Galat ditampilkan tepat di atas tombol, bukan di tempat yang jauh.
+//   Kesalahan paling sering terjadi di sini adalah email atau kata sandi
+//   yang salah, dan pesannya perlu dibaca sebelum orang mencoba lagi
+// - Isian memakai komponen BidangAuth yang sama dengan halaman Daftar dan
+//   Atur Ulang, supaya ketiganya tidak bisa berbeda tampilan
 
 export default function LayarMasuk() {
   const { session, loading, masuk, galat, hapusGalat } = useSesi();
@@ -86,109 +90,38 @@ export default function LayarMasuk() {
                 Gunakan akun yang sudah didaftarkan administrator.
               </Text>
 
-              <View className="mt-5">
-                <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
-                  Email
-                </Text>
-                <View
-                  className={`h-14 flex-row items-center gap-2.5 rounded-2xl border-2 bg-bw-surface px-4 ${
-                    fokus === 'email' ? 'border-bw-blue' : 'border-transparent'
-                  }`}
-                >
-                  <Ikon
-                    nama="mail-outline"
-                    token={fokus === 'email' ? 'bw-blue' : 'bw-muted'}
-                    ukuran={18}
-                  />
-                  <TextInput
-                    value={email}
-                    onChangeText={(nilai) => {
-                      setEmail(nilai);
-                      if (galat) hapusGalat();
-                    }}
-                    onFocus={() => setFokus('email')}
-                    onBlur={() => setFokus(null)}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    keyboardType="email-address"
-                    textContentType="emailAddress"
-                    placeholder="nama@bawaslu.go.id"
-                    placeholderTextColor="#9a9aa0"
-                    accessibilityLabel="Email"
-                    returnKeyType="next"
-                    onSubmitEditing={() => refSandi.current?.focus()}
-                    blurOnSubmit={false}
-                    className="flex-1 text-base text-bw-ink"
-                  />
-                </View>
-              </View>
+              <BidangAuth
+                label="Email"
+                nilai={email}
+                onUbah={(nilai) => {
+                  setEmail(nilai);
+                  if (galat) hapusGalat();
+                }}
+                jenis="email"
+                placeholder="nama@bawaslu.go.id"
+                autoComplete="email"
+                keyboardType="email-address"
+                returnKeyType="next"
+                onSubmit={() => refSandi.current?.focus()}
+              />
 
               <View className="mt-4">
-                <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
-                  Kata sandi
-                </Text>
-                <View
-                  className={`h-14 flex-row items-center gap-2.5 rounded-2xl border-2 bg-bw-surface pl-4 pr-1 ${
-                    fokus === 'sandi' ? 'border-bw-blue' : 'border-transparent'
-                  }`}
-                >
-                  <Ikon
-                    nama="lock-closed-outline"
-                    token={fokus === 'sandi' ? 'bw-blue' : 'bw-muted'}
-                    ukuran={18}
-                  />
-                  <TextInput
-                    ref={refSandi}
-                    value={sandi}
-                    onChangeText={(nilai) => {
-                      setSandi(nilai);
-                      if (galat) hapusGalat();
-                    }}
-                    onFocus={() => setFokus('sandi')}
-                    onBlur={() => setFokus(null)}
-                    secureTextEntry={!lihatSandi}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="password"
-                    textContentType="password"
-                    placeholder="Kata sandi"
-                    placeholderTextColor="#9a9aa0"
-                    accessibilityLabel="Kata sandi"
-                    onSubmitEditing={kirim}
-                    returnKeyType="go"
-                    className="flex-1 text-base text-bw-ink"
-                  />
-                  <Pressable
-                    onPress={() => setLihatSandi((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      lihatSandi ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'
-                    }
-                    hitSlop={8}
-                    className="h-12 w-12 items-center justify-center rounded-full active:opacity-70"
-                  >
-                    <Ikon
-                      nama={lihatSandi ? 'eye-off-outline' : 'eye-outline'}
-                      token="bw-muted"
-                      ukuran={20}
-                    />
-                  </Pressable>
-                </View>
+                <BidangAuth
+                  label="Kata sandi"
+                  nilai={sandi}
+                  onUbah={(nilai) => {
+                    setSandi(nilai);
+                    if (galat) hapusGalat();
+                  }}
+                  jenis="sandi"
+                  placeholder="Kata sandi"
+                  autoComplete="password"
+                  returnKeyType="go"
+                  onSubmit={kirim}
+                  refInput={refSandi}
+                />
               </View>
-
-              {galat ? (
-                <View
-                  accessibilityRole="alert"
-                  className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3"
-                >
-                  <Ikon nama="alert-circle-outline" token="bw-red" ukuran={18} />
-                  <Text className="flex-1 text-sm leading-relaxed text-bw-red">
-                    {galat}
-                  </Text>
-                </View>
-              ) : null}
-
+              {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Masuk"
@@ -211,12 +144,36 @@ export default function LayarMasuk() {
               </Pressable>
             </View>
 
-            <View className="mt-6 flex-row items-start justify-center gap-2 px-2">
-              <Text className="flex-1 text-center text-xs leading-relaxed text-bw-muted">
-              <Ikon nama="shield-checkmark-outline" token="bw-muted" ukuran={14} />
-                Hanya untuk staf yang sudah terdaftar. Hubungi administrator bila
-                lupa kata sandi atau belum punya akun.
-              </Text>
+            <View className="mt-6 gap-1">
+              <Pressable
+                onPress={() => router.replace("/daftar")}
+                accessibilityRole="button"
+                accessibilityLabel="Daftar akun baru"
+                className="h-12 items-center justify-center rounded-2xl active:opacity-70"
+              >
+                <Text className="text-base font-bold text-bw-blue">
+                  Belum punya akun? Daftar
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.replace("/lupa-password")}
+                accessibilityRole="button"
+                accessibilityLabel="Lupa kata sandi"
+                className="h-12 items-center justify-center rounded-2xl active:opacity-70"
+              >
+                <Text className="text-base font-bold text-bw-blue">
+                  Lupa kata sandi?
+                </Text>
+              </Pressable>
+
+              <View className="mt-1 flex-row items-start justify-center gap-2 px-2">
+                <Ikon nama="shield-checkmark-outline" token="bw-muted" ukuran={14} />
+                <Text className="flex-1 text-center text-xs leading-relaxed text-bw-muted">
+                  Hanya untuk staf yang sudah terdaftar. Hubungi administrator
+                  bila butuh akses.
+                </Text>
+              </View>
             </View>
           </View>
         </ScrollView>

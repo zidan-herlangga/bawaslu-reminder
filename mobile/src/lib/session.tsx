@@ -7,7 +7,10 @@ import {
   useMemo,
   useState,
 } from 'react';
+import * as Linking from 'expo-linking';
+import { pesanGalatAuth } from '../shared/daftar';
 import { supabase } from './supabase';
+import type { HasilDaftar, NilaiPendaftaranTanpaSandi } from '../shared/daftar';
 
 // Sesi masuk, mengikuti pola src/hooks/useSession.js di web.
 //
@@ -20,6 +23,9 @@ export interface NilaiSesi {
   session: Session | null;
   loading: boolean;
   masuk: (email: string, password: string) => Promise<void>;
+  daftar: (nilai: NilaiPendaftaranTanpaSandi) => Promise<HasilDaftar>;
+  kirimTautanAturUlang: (email: string) => Promise<void>;
+  aturSandiBaru: (sandi: string) => Promise<void>;
   keluar: () => Promise<void>;
   /** Pesan galat terakhir, dibersihkan setelah dibaca. */
   galat: string;
@@ -105,6 +111,95 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Membuat akun baru, lalu menulis baris profilnya.
+   *
+   * Dua langkah, bukan satu, dan urutannya penting: profil baru hanya boleh
+   * ditulis kalau akunnya benar-benar jadi. Kalau dibalik, bisa ada baris
+   * profiles untuk orang yang tidak punya akun.
+   *
+   * "Kembalikan tanpa sesi" berarti signUp tidak mengembalikan sesi, yaitu
+   * Confirm email masih aktif di Supabase. Kasus itu dikembalikan sebagai
+   * nilai, bukan dilempar, supaya layar bisa menampilkan petunjuk cara
+   * memperbaikinya.
+   */
+  const daftar = useCallback(
+    async (nilai: NilaiPendaftaranTanpaSandi): Promise<HasilDaftar> => {
+      setGalat('');
+
+      const { data, error } = await supabase.auth.signUp({
+        email: nilai.email,
+        password: nilai.sandi,
+        options: {
+          data: {
+            nama_lengkap: nilai.namaLengkap,
+            divisi: nilai.divisi,
+            jabatan: nilai.jabatan,
+          },
+        },
+      });
+
+      if (error) throw error;
+      if (!data.user) return { ok: false, sebab: 'tidak-ada-pengguna' };
+
+      // Confirm email masih aktif: akun sudah dibuat tapi belum bisa dipakai.
+      // Menulis profil di sini akan ditolak RLS karena belum ada sesi.
+      if (!data.session) {
+        return { ok: false, sebab: 'butuh-konfirmasi-email' };
+      }
+
+      const { error: galatProfil } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        nama_lengkap: nilai.namaLengkap,
+        email: nilai.email,
+        divisi: nilai.divisi,
+        jabatan: nilai.jabatan,
+        role_akses: 'Staf',
+        status_akun: 'Aktif',
+      });
+
+      if (galatProfil) return { ok: false, sebab: 'profil-gagal' };
+
+      return { ok: true };
+    },
+    []
+  );
+
+  /**
+   * Meminta Supabase mengirim tautan atur ulang kata sandi.
+   *
+   * redirectTo memakai skema aplikasi, bukan alamat web, supaya tautannya
+   * membuka aplikasi ini di perangkat. Skemanya diambil dari app.json:
+   * bawaslu-jadwal, dari app.json. authorities=reset-password menunjuk route
+   * menerima tautan itu.
+   */
+  const kirimTautanAturUlang = useCallback(async (email: string) => {
+    setGalat('');
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: Linking.createURL('reset-password'),
+    });
+
+    if (error) {
+      setGalat(pesanGalatAuth(error));
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Menyimpan kata sandi baru setelah tautan atur ulang dibuka.
+   */
+  const aturSandiBaru = useCallback(async (sandi: string) => {
+    setGalat('');
+
+    const { error } = await supabase.auth.updateUser({ password: sandi });
+
+    if (error) {
+      setGalat(pesanGalatAuth(error));
+      throw error;
+    }
+  }, []);
+
   const keluar = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) return;
@@ -123,8 +218,18 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
   const hapusGalat = useCallback(() => setGalat(''), []);
 
   const nilai = useMemo<NilaiSesi>(
-    () => ({ session, loading, masuk, keluar, galat, hapusGalat }),
-    [session, loading, masuk, keluar, galat, hapusGalat]
+    () => ({
+      session,
+      loading,
+      masuk,
+      daftar,
+      keluar,
+      kirimTautanAturUlang,
+      aturSandiBaru,
+      galat,
+      hapusGalat,
+    }),
+    [session, loading, masuk, daftar, keluar, kirimTautanAturUlang, aturSandiBaru, galat, hapusGalat]
   );
 
   return <KonteksSesi.Provider value={nilai}>{children}</KonteksSesi.Provider>;
