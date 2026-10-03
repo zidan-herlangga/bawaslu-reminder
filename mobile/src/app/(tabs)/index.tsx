@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ import { sortByAgenda, type Jadwal, type Slot } from '../../shared/slots';
 const KELIP_MS = 30 * 1000;
 
 export default function LayarBeranda() {
+  const router = useRouter();
   const { session } = useSesi();
   const userId = session?.user.id ?? null;
 
@@ -159,14 +161,26 @@ export default function LayarBeranda() {
             </Text>
           </View>
 
-          <Pressable
-            onPress={segarkan}
-            accessibilityRole="button"
-            accessibilityLabel="Segarkan jadwal"
-            className="h-12 w-12 items-center justify-center rounded-full bg-bw-card active:opacity-70"
-          >
-            <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => router.push('/jadwal/baru')}
+              accessibilityRole="button"
+              accessibilityLabel="Buat jadwal baru"
+              className="h-12 flex-1 items-center justify-center rounded-full bg-bw-blue active:opacity-80"
+            >
+              <Ikon nama="add" token="bw-blue-50" ukuran={19} />
+              <Text className="ml-1 text-sm font-bold text-white">Buat</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={segarkan}
+              accessibilityRole="button"
+              accessibilityLabel="Segarkan jadwal"
+              className="h-12 w-12 items-center justify-center rounded-full bg-bw-card active:opacity-70"
+            >
+              <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView
@@ -257,12 +271,7 @@ export default function LayarBeranda() {
               milikSaya={item.pembuat_id === userId}
               onDetail={() => setDetail({ jadwal: item, sesi: null })}
               onIngatkan={() => ingatkan(item)}
-              onUbah={() =>
-                showToast(
-                  'Ubah jadwal belum tersedia di aplikasi ini. Buka aplikasi web.',
-                  'info'
-                )
-              }
+              onUbah={() => router.push(`/jadwal/${item.id}`)}
               onHapus={() => setKonfirmasi(item)}
             />
           ))}
@@ -277,6 +286,9 @@ export default function LayarBeranda() {
         milikSaya={detail ? detail.jadwal.pembuat_id === userId : false}
         onTutup={() => setDetail(null)}
         onIngatkan={detail ? () => ingatkan(detail.jadwal) : undefined}
+        onUbah={
+          detail ? () => router.push(`/jadwal/${detail.jadwal.id}`) : undefined
+        }
         onHapus={detail ? () => setKonfirmasi(detail.jadwal) : undefined}
       />
 
