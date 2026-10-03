@@ -207,7 +207,7 @@ export function ModalDetail({
 
             <Blok ikon="person-outline" label="Dibuat oleh">
               <Text className="text-sm text-bw-ink">
-                {jadwal.pembuat_nama} · {namaDivisi(jadwal.pembuat_divisi)}
+                {jadwal.pembuat_nama} - {namaDivisi(jadwal.pembuat_divisi)}
               </Text>
             </Blok>
 

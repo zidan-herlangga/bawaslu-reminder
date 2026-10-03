@@ -62,19 +62,34 @@ Kalau warnanya diubah di web, jalankan `npm run tema` di folder ini.
 Konsekuensinya: mengubah warna berarti menyentuh dua tempat. Itu disengaja,
 dengan syarat generate-tema selalu dijalankan sebelum commit.
 
-## Notifikasi
+## Pengingat
 
-Dua jenis, dan bedanya penting.
+Ada dua mekanisme yang berbeda, dan bedanya menentukan apa yang bisa diharapkan.
 
-| Jenis | Sumber | Expo Go Android | Expo Go iOS | Development build |
-| --- | --- | --- | --- | --- |
-| Lokal | Dijadwalkan di perangkat | Tidak berjalan | Berjalan | Berjalan |
-| Remote | Dikirim dari server | Tidak berjalan | Terbatas | Berjalan |
+| Mekanisme | Expo Go Android | Expo Go iOS | Development build |
+| --- | --- | --- | --- |
+| Banner di dalam aplikasi | Berjalan | Berjalan | Berjalan |
+| Notifikasi lokal sistem | Tidak berjalan | Berjalan | Berjalan |
+| Notifikasi remote dari server | Tidak berjalan | Terbatas | Berjalan |
 
-Perbedaannya lebih besar dari yang biasa disebut orang. Di Expo Go Android,
-`expo-notifications` **melempar galat begitu modulnya diimpor**, bukan hanya
-saat push dipakai. Jadi bukan cuma push yang mati: notifikasi lokal ikut mati
-karena keduanya butuh modul yang sama.
+Pengingat dalam aplikasi adalah banner yang muncul di atas layar selama aplikasi
+terbuka. Jadwal yang sedang berjalan, atau yang dimulai dalam 15 menit ke depan,
+muncul sebagai banner yang bertahan sampai ditutup.
+
+Alat ini dipilih sebagai mekanisme utama karena satu-satunya yang bisa diuji di
+semua lingkungan tanpa kredensial apa pun. Batasnya harus disebut terang: banner
+hanya muncul selama aplikasi terbuka. Tidak ada yang membangunkan perangkat saat
+aplikasi ditutup.
+
+Aturan laporannya ada di `src/shared/pengingat.ts` dan diuji seluruhnya, termasuk
+kasus yang biasanya jadi sumber bug: jadwal berlapis beberapa hari, jadwal
+dibatalkan, sesi yang sudah lewat jauh, dan waktu yang tidak valid.
+
+### Kenapa notifikasi sistem tidak bisa diandalkan di Expo Go
+
+Di Expo Go Android, `expo-notifications` **melempar galat begitu modulnya
+diimpor**, bukan hanya saat push dipakai. Jadi bukan cuma push yang mati:
+notifikasi lokal ikut mati karena keduanya butuh modul yang sama.
 
 Akibatnya `src/lib/notifikasi.ts` tidak pernah mengimpor modul itu secara
 statis. Imornya dilakukan malas di dalam fungsi, dan hanya kalau lingkungan ini
@@ -85,13 +100,14 @@ supaya tidak terlihat seperti kesalahan.
 Aturan memutuskan ini ada di `src/shared/dukunganNotifikasi.ts` dan diuji, bukan
 ditulis langsung di dalam modul notifikasi.
 
-Notifikasi remote butuh development build, dan sudah dihapus dari Expo Go sejak
-SDK 53.Itu bagian yang paling sering membuat orang salah langkah: kode
-push akan terlihat benar saat diuji di Expo Go, lalu gagal_total di perangkat
-asli.
+Push remote sudah dihapus dari Expo Go sejak SDK 53. Itu bagian yang paling
+sering membuat orang salah langkah: kode push akan terlihat benar saat diuji di
+Expo Go, lalu gagal total di perangkat asli.
 
-Untuk tahap sekarang, yang bisa diuji tanpa kredensial apa pun adalah notifikasi
-lokal. Pengiriman dari server mengikuti setelah ada development build.
+Untuk push dari server, perangkat harus mendaftarkan tokennya lebih dulu. Itu
+dilakukan oleh `daftarTokenPush()` di `src/lib/notifikasi.ts`, yang menulis ke
+tabel `device_tokens`. Tanpa langkah itu, sisi server tidak pernah tahu ada
+perangkat yang harus dikirimi.
 
 ### Untuk push dari server
 

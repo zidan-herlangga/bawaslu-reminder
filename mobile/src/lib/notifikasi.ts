@@ -4,6 +4,7 @@ import {
   alasanTidakDidukung,
   notifikasiDidukung,
 } from '../shared/dukunganNotifikasi';
+import { supabase } from './supabase';
 
 // Notifikasi di aplikasi native.
 //
@@ -184,8 +185,7 @@ export async function mintaIzinNotifikasi(): Promise<StatusNotifikasi> {
   }
 }
 
-/**
- * Membuka pengaturan sistem untuk aplikasi ini. Dipakai saat izin sudah
+/** Membuka pengaturan sistem untuk aplikasi ini. Dipakai saat izin sudah
  * ditolak dan tidak bisa diminta lagi dari dalam aplikasi.
  */
 export async function bukaPengaturanSistem(): Promise<void> {
@@ -194,6 +194,74 @@ export async function bukaPengaturanSistem(): Promise<void> {
   } catch (kesalahan) {
     console.warn('[notifikasi] gagal membuka pengaturan:', pesanGalat(kesalahan));
   }
+}
+
+/**
+ * Mendaftarkan perangkat ini ke tabel device_tokens supaya server bisa
+ * mengirim push lewat FCM atau APNs.
+ *
+ * Mengembalikan false di Expo Go Android adalah hal yang wajar, bukan kesalahan:
+ * token tidak bisa diambil karena paketnya tidak tersedia di sana. Yang penting
+ * pemanggil tidak menganggapnya gagal dan tidak mencoba terus-menerus.
+ */
+export async function daftarTokenPush(userId: string): Promise<boolean> {
+  const Notifications = await muatModul();
+  if (!Notifications) return false;
+
+  try {
+    await siapkanChannel();
+
+    // TokenExpo hanya tersedia di development build. Di Expo Go, jalur ini
+    // sudah berhenti di atas, jadi tidak perlu penanganan terpisah.
+    const perangkat = await Notifications.getDevicePushTokenAsync();
+    const token = perangkat.data;
+
+    if (typeof token !== 'string' || !token) return false;
+
+    const { error } = await supabase.from('device_tokens').upsert(
+      {
+        user_id: userId,
+        token,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        diperbarui_pada: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,token' }
+    );
+
+    if (error) {
+      console.warn('[notifikasi] gagal menyimpan token:', pesanGalat(error));
+      return false;
+    }
+
+    return true;
+  } catch (kesalahan) {
+    console.warn('[notifikasi] gagal mengambil token:', pesanGalat(kesalahan));
+    return false;
+  }
+}
+
+/**
+ * Menjadwalkan pengingat untuk setiap sesi pada satu jadwal.
+ *
+ * Satu jadwal bisa punya beberapa sesi, jadi semuanya dijadwalkan. Sesi yang
+ * waktunya sudah lewat tidak dijadwalkan, karena notifikasi untuk waktu yang
+ * sudah pergi hanya akan muncul telat dan membingungkan.
+ */
+export async function jadwalkanPengingatJadwal(
+  jadwal: JadwalPengingat[],
+  now: number = Date.now()
+): Promise<number> {
+  let dijadwalkan = 0;
+
+  for (const pengingat of jadwal) {
+    const mulai = new Date(pengingat.mulaiIso).getTime();
+    if (Number.isNaN(mulai) || mulai <= now) continue;
+
+    const berhasil = await ingatkanSekarang(pengingat);
+    if (berhasil) dijadwalkan += 1;
+  }
+
+  return dijadwalkan;
 }
 
 export interface JadwalPengingat {

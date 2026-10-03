@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BatasGalat from '../komponen/BatasGalat';
+import { PengingatHost } from '../komponen/PengingatHost';
 import { ToastHost } from '../komponen/ToastHost';
 import { SesiProvider } from '../lib/session';
 import { TemaProvider, useTema } from '../tema/TemaProvider';
@@ -31,8 +32,11 @@ import { TemaProvider, useTema } from '../tema/TemaProvider';
 // melempar galat, sedangkan tiap layar bisa. Satu layar yang gagal tidak boleh
 // membuat seluruh aplikasi kosong tanpa penjelasan.
 //
-// ToastHost dipasang setelah Stack supaya tergambar di atas semua layar. Ia
-// harus berada di dalam View ber-vars() agar token warnanya terbaca.
+// ToastHost dipasang setelah PengingatHost supaya toast berada di atas banner
+// pengingat. Toast menjawab aksi yang sedang dilakukan pengguna, jadi lebih
+// mendesak daripada pengingat yang memang dijadwalkan lebih dulu. Keduanya
+// digambar sebagai absolute di dalam View ber-vars() yang sama, dan yang
+// belakangan di pohon akan menutupi yang duluan.
 //
 // contentStyle dibuat transparan supaya latar bg-bw-canvas dari View di atas
 // yang tampil. Dengan begitu tidak ada kedipan putih saat pindah layar di mode
@@ -78,6 +82,7 @@ function Akar() {
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
       </Stack>
+      <PengingatHost />
       <ToastHost />
     </View>
   );

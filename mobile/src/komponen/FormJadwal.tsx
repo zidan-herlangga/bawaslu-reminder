@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarisSlot, type BidangSlot } from './BarisSlot';
 import { Ikon } from './Ikon';
+import { beriTahuStaf } from '../lib/kabarStaf';
 import { showToast } from '../lib/toast';
 import { supabase } from '../lib/supabase';
 import { DIVISI_OPTIONS, DIVISI_SHORT, KATEGORI_OPTIONS } from '../shared/options';
@@ -192,7 +193,27 @@ export default function FormJadwal({
           );
         }
 
-        showToast('Jadwal baru tersimpan dan staf sudah diberi tahu.', 'sukses');
+        const baru = data[0];
+
+        // Pemberitahuan ke staf dikirim setelah jadwal benar-benar tersimpan,
+        // dan kegagalannya tidak membatalkan penyimpanan. Pesan yang ditampilkan
+        // ikut menyesuaikan: sebelumnya aplikasi ini selalu menulis
+        // "staf sudah diberi tahu" padahal tidak pernah memanggil server sama
+        // sekali, jadi penggunanya mengira pengingat sudah terkirim.
+        if (baru?.id) {
+          const hasil = await beriTahuStaf(baru.id);
+
+          if (hasil.ok) {
+            showToast('Jadwal baru tersimpan dan staf sudah diberi tahu.', 'sukses');
+          } else {
+            showToast(
+              `Jadwal tersimpan, tapi staf belum diberi tahu. ${hasil.alasan}`,
+              'galat'
+            );
+          }
+        } else {
+          showToast('Jadwal baru tersimpan.', 'sukses');
+        }
       }
 
       onSelesai();

@@ -72,7 +72,7 @@ export function KartuJadwal({
 
   let teksWaktu = 'Waktu belum ditentukan';
   if (berikutnya) {
-    teksWaktu = `${rentang(berikutnya.mulai, berikutnya.selesai)} · ${formatSisa(
+    teksWaktu = `${rentang(berikutnya.mulai, berikutnya.selesai)} - ${formatSisa(
       new Date(berikutnya.mulai).getTime(),
       now
     )}`;
@@ -206,7 +206,7 @@ export function KartuJadwal({
             <Ikon nama="person-outline" token="bw-muted" ukuran={13} />
           </View>
           <Text numberOfLines={1} className="min-w-0 flex-1 text-xs text-bw-muted">
-            {jadwal.pembuat_nama} · {namaDivisi(jadwal.pembuat_divisi)}
+            {jadwal.pembuat_nama} - {namaDivisi(jadwal.pembuat_divisi)}
           </Text>
         </View>
         {!milikSaya ? (

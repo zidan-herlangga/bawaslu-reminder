@@ -9,6 +9,7 @@ import { useTema, type PilihanTema } from '../../tema/TemaProvider';
 import {
   alasanTidakBisaDipakai,
   cekIzinNotifikasi,
+  daftarTokenPush,
   mintaIzinNotifikasi,
   pesanStatus,
   type StatusNotifikasi,
@@ -61,6 +62,15 @@ export default function LayarAkun() {
     void cekIzinNotifikasi().then(setIzinNotifikasi);
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+
+    // Pendaftaran token hanya berguna kalau notifikasi sistem benar-benar
+    // tersedia. Di Expo Go Android fungsi ini mengembalikan false dengan
+    // cepat tanpa menyentuh expo-notifications, jadi aman dipanggil di mana saja.
+    void daftarTokenPush(session.user.id);
+  }, [session]);
+
   const mintaIzin = useCallback(async () => {
     const hasil = await mintaIzinNotifikasi();
     setIzinNotifikasi(hasil);
@@ -102,7 +112,7 @@ export default function LayarAkun() {
     ]);
   }, [keluar]);
 
-  const subjudulProfil = [profil?.jabatan, profil?.divisi].filter(Boolean).join(' · ');
+  const subjudulProfil = [profil?.jabatan, profil?.divisi].filter(Boolean).join(' - ');
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
@@ -169,6 +179,30 @@ export default function LayarAkun() {
             judul="Izin notifikasi"
             keterangan={pesanStatus(izinNotifikasi)}
             onTekan={izinNotifikasi === 'ekspo-go' ? undefined : mintaIzin}
+          />
+          <Baris
+            ikon="alarm-outline"
+            judul="Pengingat dalam aplikasi"
+            keterangan="Aktif"
+            terakhir
+          />
+        </Bagian>
+
+        <Bagian
+          judul="Cara pengingat bekerja"
+          catatan={[
+            'Pengingat dalam aplikasi: sesi yang sedang berjalan atau dimulai',
+            'dalam 15 menit ke depan muncul sebagai banner, dan bertahan sampai',
+            'ditutup. Banner hanya muncul selama aplikasi terbuka.',
+            alasanTidakBisaDipakai()
+              ? `Notifikasi sistem: ${alasanTidakBisaDipakai()}`
+              : 'Notifikasi sistem: aktif, pengingat sampai walau aplikasi ditutup.',
+          ].join(' ')}
+        >
+          <Baris
+            ikon="information-circle-outline"
+            judul="Batas pengingat dalam aplikasi"
+            keterangan="Hanya saat aplikasi terbuka"
             terakhir
           />
         </Bagian>
