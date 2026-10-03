@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ikon } from '../../komponen/Ikon';
 import { Lencana, LencanaSelesai } from '../../komponen/Lencana';
+import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { useSesi } from '../../lib/session';
 import { useJadwal } from '../../lib/useJadwal';
 import { formatJam, formatTanggalPanjang } from '../../shared/formatWaktu';
@@ -66,7 +67,7 @@ export default function LayarAgenda() {
   const { session } = useSesi();
   const userId = session?.user.id ?? null;
 
-  const { jadwal, memuat, muatUlang } = useJadwal(userId);
+  const { jadwal, memuat, terhubung, muatUlang } = useJadwal(userId);
 
   const [terpilih, setTerpilih] = useState(() => new Date());
   const [bulanTampil, setBulanTampil] = useState(() => awalBulan(new Date()));
@@ -179,6 +180,8 @@ export default function LayarAgenda() {
             <Text className="mt-1 text-sm text-bw-muted">
               Pilih tanggal untuk melihat jadwal.
             </Text>
+
+            <LampuRealtime terhubung={terhubung} />
           </View>
 
           <Pressable

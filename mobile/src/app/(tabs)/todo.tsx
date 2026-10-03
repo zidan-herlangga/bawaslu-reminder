@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ikon } from '../../komponen/Ikon';
+import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { useSesi } from '../../lib/session';
 import { showToast } from '../../lib/toast';
 import { supabase } from '../../lib/supabase';
@@ -40,6 +41,7 @@ export default function LayarTugas() {
 
   const [daftar, setDaftar] = useState<Todo[]>([]);
   const [memuat, setMemuat] = useState(true);
+  const [terhubung, setTerhubung] = useState(false);
   const [menyegarkan, setMenyegarkan] = useState(false);
   const [teks, setTeks] = useState('');
   const [menambah, setMenambah] = useState(false);
@@ -101,9 +103,13 @@ export default function LayarTugas() {
           void muat();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (!mounted.current) return;
+        setTerhubung(status === 'SUBSCRIBED');
+      });
 
     return () => {
+      setTerhubung(false);
       supabase.removeChannel(channel);
     };
   }, [userId, muat]);
@@ -196,6 +202,8 @@ export default function LayarTugas() {
             ? 'Semua tugas sudah selesai.'
             : `${belum.length} belum selesai`}
         </Text>
+
+        <LampuRealtime terhubung={terhubung} />
 
         {/* Ringkasan progres */}
         {daftar.length > 0 ? (

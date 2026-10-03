@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { KartuJadwal } from '../../komponen/KartuJadwal';
+import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { ModalDetail } from '../../komponen/ModalDetail';
 import { apiUrl } from '../../lib/api';
 import { useSesi } from '../../lib/session';
@@ -33,7 +34,7 @@ export default function LayarBeranda() {
   const { session } = useSesi();
   const userId = session?.user.id ?? null;
 
-  const { jadwal, memuat, galat, muatUlang } = useJadwal(userId);
+  const { jadwal, memuat, galat, terhubung, muatUlang } = useJadwal(userId);
 
   const [now, setNow] = useState(() => Date.now());
   const [divisi, setDivisi] = useState<string | null>(null);
@@ -163,6 +164,8 @@ export default function LayarBeranda() {
             <Text className="mt-1 text-sm text-bw-muted">
               {terlihat.length} jadwal ditampilkan
             </Text>
+
+            <LampuRealtime terhubung={terhubung} />
           </View>
 
           <View className="flex-row items-center gap-2">

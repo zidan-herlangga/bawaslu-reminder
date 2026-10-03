@@ -347,10 +347,85 @@ create policy "delete own device tokens"
   using (auth.uid() = user_id);
 
 -- =====================================================================
--- 8. Refresh schema cache PostgREST + verifikasi
+-- 8. Realtime: daftarkan tabel ke publication supabase_realtime
+-- =====================================================================
+--
+-- Bagian ini yang paling sering terlewat, dan akibatnya tidak kelihatan.
+-- Kode aplikasi sudah benar-benar berlangganan postgres_changes di tiga
+-- tabel:
+--
+--   schedules     mobile/src/lib/useJadwal.ts, src/hooks/useSchedules.js
+--   todos         mobile/src/app/(tabs)/todo.tsx
+--   notifications src/components/AppShell.jsx
+--
+-- Tapi subscribing ke postgres_changes hanya berarti "minta supaya diberi tahu".
+-- Kalau nama tabelnya tidak ada di publication supabase_realtime, Supabase
+-- tidak pernah mengirim satu pun peristiwa. Channel tetap SUBSCRIBED, tidak ada
+-- error, tidak ada peringatan. Daftarnya di layar tetap bergerak, cuma karena
+-- ada polling 30 detik yang menutupi kekurangannya. Rasanya seperti realtime
+-- padahal tidak.
+--
+-- Perintah di bawah aman dijalankan berulang, jadi tidak perlu tahu apakah
+-- publication-nya sudah berisi tabel tersebut.
+
+-- Publication ini sudah ada bawaan Supabase. Kalau ternyata tidak, lebih baik
+-- diberi tahu lewat peringatan daripada gagal di tengah-tengah skrip.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    raise notice 'Publication supabase_realtime tidak ditemukan. Aktifkan Realtime di Supabase > Database > Replication.';
+  end if;
+end $$;
+
+-- Menambahkan tabel ke publication dalam loop, dan hanya kalau belum ada.
+-- alter publication ... add table akan gagal kalau tabelnya sudah terdaftar,
+-- jadi pengecekan ini wajib, bukan opsional.
+do $$
+declare
+  nama_tabel text;
+begin
+  foreach nama_tabel in array array['schedules', 'todos', 'notifications'] loop
+    if exists (
+      select 1 from pg_publication
+      where pubname = 'supabase_realtime'
+    ) and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = nama_tabel
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', nama_tabel);
+      raise notice 'Realtime: tabel % ditambahkan ke publication.', nama_tabel;
+    end if;
+  end loop;
+end $$;
+
+-- REPLICA IDENTITY FULL membuat Postgres ikut menulis baris lama ke dalam WAL.
+-- Untuk DELETE, dan untuk langganan yang menyaring kolom, Postgres butuh
+-- nilai primary key di dalam payload supaya aturan RLS bisa dievaluasi.
+--
+-- Catatan jujur: tabel yang sudah punya primary key sebenarnya cukup, karena
+-- replica identity DEFAULT sudah menyertakan primary key. Ditulisnya di sini
+-- karena tabel dipakai bersama oleh web dan native, dan penyaring kolom
+-- masih mungkin ditambahkan kemudian. Menulisnya sekarang jauh lebih murah
+-- daripada menelusuri "kenapa event DELETE-nya tidak sampai" di kemudian
+-- hari.
+alter table public.schedules replica identity full;
+alter table public.todos replica identity full;
+alter table public.notifications replica identity full;
+
+-- =====================================================================
+-- 9. Refresh schema cache PostgREST + verifikasi
 -- =====================================================================
 
 notify pgrst, 'reload schema';
+
+-- Verifikasi realtime: tiga tabel ini harus muncul di daftar.
+select pubname, schemaname, tablename
+from pg_publication_tables
+where pubname = 'supabase_realtime'
+order by tablename;
 
 -- Verifikasi 1: kolom slots + target_divisi harus muncul di daftar.
 select column_name, data_type, is_nullable

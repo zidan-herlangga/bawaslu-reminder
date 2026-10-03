@@ -8,13 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "vapid": "web-push generate-vapid-keys",
-    "test": "npm run test:ics && npm run test:notify && npm run test:detail && npm run test:identifier",
+    "test": "npm run test:ics && npm run test:notify && npm run test:detail && npm run test:identifier && npm run test:realtime",
     "test:ics": "node scripts/test-ics.mjs",
     "test:notify": "node scripts/test-notify.mjs",
     "test:detail": "node scripts/test-detail-ssr.mjs",
     "test:identifier": "node scripts/cek-semua.mjs",
     "test:e2e": "node scripts/e2e-notify.mjs",
-    "push:cek": "node scripts/cek-push.mjs"
+    "push:cek": "node scripts/cek-push.mjs",
+    "test:realtime": "node scripts/test-realtime.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
