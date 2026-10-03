@@ -23,6 +23,20 @@ cp .env.example .env      # lalu isi nilainya
 npm run start             # lalu pindai QR dengan Expo Go
 ```
 
+Setelah `npm run start` muncul menu. Pilih sesuai perangkat:
+
+| Tombol | Untuk apa |
+| --- | --- |
+| `a` | Buka di emulator atau perangkat Android |
+| `i` | Buka di simulator iOS (hanya macOS) |
+| `r` | Muat ulang aplikasi di perangkat yang sedang terhubung |
+| `w` | Buka di peramban |
+
+**Jangan menekan `w` kalau maksudnya menguji di HP.** Versi peramban bukan
+tujuan aplikasi ini, dan beberapa bagian hanya berfungsi di perangkat: izin
+notifikasi, pemutar suara, dan penambahan ke kalender. Tekan `a`, atau pindai
+QR dengan Expo Go.
+
 | Perintah | Untuk apa |
 | --- | --- |
 | `npm start` | Dev server |
