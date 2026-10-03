@@ -1,4 +1,4 @@
-import type { Session } from '@supabase/supabase-js';
+import type { AuthError, Session } from '@supabase/supabase-js';
 import {
   createContext,
   useCallback,
@@ -12,8 +12,9 @@ import { supabase } from './supabase';
 // Sesi masuk, mengikuti pola src/hooks/useSession.js di web.
 //
 // Bedanya: di web perpindahan halaman ditangani router, sedangkan di native
-// yang mengarahkan ke layar masuk adalah layout di src/app/_layout.tsx. Hook
-// ini hanya melaporkan apa yang terjadi, tanpa menyentuh navigasi.
+// penjagaannya dilakukan tiap layar: layar masuk mengarahkan yang sudah punya
+// sesi ke tab, dan layout tab mengarahkan yang belum punya sesi ke layar masuk.
+// Hook ini hanya melaporkan apa yang terjadi, tanpa menyentuh navigasi.
 
 export interface NilaiSesi {
   session: Session | null;
@@ -26,6 +27,35 @@ export interface NilaiSesi {
 }
 
 const KonteksSesi = createContext<NilaiSesi | null>(null);
+
+/**
+ * Menerjemahkan galat masuk dari Supabase menjadi kalimat yang berguna bagi
+ * staf. Pencocokan memakai kode galat dan teks pesan, bukan status HTTP saja:
+ * status 400 juga dipakai untuk kasus lain, misalnya email yang belum
+ * dikonfirmasi, dan itu tidak boleh dibaca sebagai "kata sandi salah".
+ */
+function terjemahkanGalatMasuk(error: AuthError): string {
+  const pesan = error.message.toLowerCase();
+  const kode = (error as { code?: string }).code;
+
+  if (kode === 'invalid_credentials' || pesan.includes('invalid login credentials')) {
+    return 'Email atau kata sandi tidak cocok.';
+  }
+
+  if (kode === 'email_not_confirmed' || pesan.includes('email not confirmed')) {
+    return 'Email belum dikonfirmasi. Hubungi administrator.';
+  }
+
+  if (error.status === 429 || kode === 'over_request_rate_limit') {
+    return 'Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.';
+  }
+
+  if (pesan.includes('network') || pesan.includes('fetch')) {
+    return 'Tidak bisa terhubung ke server. Periksa koneksi internet.';
+  }
+
+  return `Gagal masuk: ${error.message}`;
+}
 
 export function SesiProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -70,26 +100,23 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      // Pesan dari Supabase dalam bahasa Inggris dan cukup teknis. Yang lebih
-      // berguna bagi staf adalah menyebut kredensialnya secara langsung.
-      const salahSandi =
-        error.message.toLowerCase().includes('invalid login credentials') ||
-        error.status === 400;
-
-      setGalat(
-        salahSandi
-          ? 'Email atau kata sandi tidak cocok.'
-          : `Gagal masuk: ${error.message}`
-      );
+      setGalat(terjemahkanGalatMasuk(error));
       throw error;
     }
   }, []);
 
   const keluar = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.warn('[sesi] gagal keluar:', error.message);
-      setGalat(`Gagal keluar: ${error.message}`);
+    if (!error) return;
+
+    console.warn('[sesi] gagal keluar:', error.message);
+
+    // Kalau server tidak terjangkau (mis. tanpa internet), pengguna tetap harus
+    // bisa keluar dari perangkat ini. Hapus sesi lokal saja sebagai cadangan.
+    const lokal = await supabase.auth.signOut({ scope: 'local' });
+    if (lokal.error) {
+      console.warn('[sesi] gagal menghapus sesi lokal:', lokal.error.message);
+      setGalat(`Gagal keluar: ${lokal.error.message}`);
     }
   }, []);
 

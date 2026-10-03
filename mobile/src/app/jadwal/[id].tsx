@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useSesi } from '../../lib/session';
-import { supabase } from '../../lib/supabase';
 import FormJadwal, { type ProfilPembuat } from '../../komponen/FormJadwal';
 import { LayarGalat, LayarTunggu } from '../../komponen/LayarTunggu';
+import { useSesi } from '../../lib/session';
+import { supabase } from '../../lib/supabase';
 import { formDariJadwal, type FormJadwal as BentukForm } from '../../shared/validasiJadwal';
 
 // Route ubah jadwal.
@@ -31,15 +31,28 @@ export default function LayarUbahJadwal() {
   const [siap, setSiap] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) return undefined;
+
     if (!id) {
       setAlasan('Jadwal tidak ditemukan.');
       setSiap(true);
-      return;
+      return undefined;
     }
-    if (!userId) return;
+
+    // Tanpa sesi, jadwal tidak akan pernah dimuat. Berhenti di sini dan
+    // tampilkan pesan, jangan biarkan layar menunggu selamanya.
+    if (!userId) {
+      setAlasan('Sesi tidak ditemukan. Silakan masuk kembali.');
+      setSiap(true);
+      return undefined;
+    }
 
     let aktif = true;
+
+    // Mulai dari keadaan bersih kalau id berganti.
+    setSiap(false);
+    setAlasan(null);
+    setNilaiAwal(null);
 
     (async () => {
       const { data, error } = await supabase
@@ -66,9 +79,7 @@ export default function LayarUbahJadwal() {
       // ke sini tapi bukan miliknya, lebih baik berhenti di awal daripada
       // menampilkan form yang pasti ditolak saat disimpan.
       if (data.pembuat_id !== userId) {
-        setAlasan(
-          'Anda bukan pembuat jadwal ini, jadi tidak bisa mengubahnya.'
-        );
+        setAlasan('Anda bukan pembuat jadwal ini, jadi tidak bisa mengubahnya.');
         setSiap(true);
         return;
       }
@@ -94,17 +105,22 @@ export default function LayarUbahJadwal() {
     };
   }, [id, loading, userId]);
 
-  if (!siap || !nilaiAwal) {
+  // Galat dicek lebih dulu. Sebelumnya cabang "menunggu" ada di atas dan
+  // menelan semua pesan galat, karena saat galat nilaiAwal selalu null.
+  if (alasan) {
     return (
-      <LayarTunggu
-        pesan={alasan ?? 'Memuat jadwal...'}
+      <LayarGalat
+        judul="Tidak bisa diubah"
+        pesan={alasan}
         onTutup={() => router.back()}
       />
     );
   }
 
-  if (alasan) {
-    return <LayarGalat judul="Tidak bisa diubah" pesan={alasan} onTutup={() => router.back()} />;
+  if (loading || !siap || !nilaiAwal) {
+    return (
+      <LayarTunggu pesan="Memuat jadwal..." onTutup={() => router.back()} />
+    );
   }
 
   return (

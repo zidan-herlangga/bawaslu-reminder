@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,6 +30,9 @@ export default function LayarMasuk() {
   const [email, setEmail] = useState('');
   const [sandi, setSandi] = useState('');
   const [sibuk, setSibuk] = useState(false);
+  const [fokus, setFokus] = useState<'email' | 'sandi' | null>(null);
+  const [lihatSandi, setLihatSandi] = useState(false);
+  const refSandi = useRef<TextInput>(null);
 
   if (!loading && session) {
     return <Redirect href="/(tabs)" />;
@@ -55,71 +59,131 @@ export default function LayarMasuk() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
           keyboardShouldPersistTaps="handled"
         >
-          <View className="gap-5 px-6 py-10">
-            <View className="items-center gap-3">
-              <View className="h-20 w-20 items-center justify-center rounded-3xl bg-bw-solid">
-                <Ikon nama="notifications" token="bw-solid-text" ukuran={36} />
+          <View className="px-6 py-10">
+            {/* Identitas aplikasi */}
+            <View className="items-center">
+              <View className="h-24 w-24 items-center justify-center rounded-[32px] bg-bw-blue-50">
+                <View className="h-16 w-16 items-center justify-center rounded-3xl bg-bw-solid">
+                  <Ikon nama="notifications" token="bw-solid-text" ukuran={32} />
+                </View>
               </View>
-              <Text className="text-center text-2xl font-bold text-bw-ink">
+              <Text className="mt-6 text-center text-3xl font-extrabold tracking-tight text-bw-ink">
                 Pengingat Jadwal
               </Text>
-              <Text className="text-center text-sm text-bw-muted">
-                Aplikasi internal Bawaslu Kota Bekasi
+              <Text className="mt-1.5 text-center text-sm text-bw-muted">
+                Aplikasi internal Bawaslu Bekasi Kota
               </Text>
             </View>
 
-            <View className="gap-3">
-              <View>
-                <Text className="mb-1.5 text-xs font-bold uppercase tracking-wide text-bw-muted">
+            {/* Formulir */}
+            <View className="mt-9 rounded-[28px] border border-bw-line bg-bw-card p-5">
+              <Text className="text-lg font-extrabold text-bw-ink">Masuk</Text>
+              <Text className="mt-0.5 text-xs text-bw-muted">
+                Gunakan akun yang sudah didaftarkan administrator.
+              </Text>
+
+              <View className="mt-5">
+                <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
                   Email
                 </Text>
-                <TextInput
-                  value={email}
-                  onChangeText={(nilai) => {
-                    setEmail(nilai);
-                    if (galat) hapusGalat();
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                  placeholder="nama@bawaslu.go.id"
-                  placeholderTextColor="#9a9aa0"
-                  accessibilityLabel="Email"
-                  className="h-14 rounded-2xl border border-bw-line bg-bw-card px-4 text-base text-bw-ink"
-                />
+                <View
+                  className={`h-14 flex-row items-center gap-2.5 rounded-2xl border-2 bg-bw-surface px-4 ${
+                    fokus === 'email' ? 'border-bw-blue' : 'border-transparent'
+                  }`}
+                >
+                  <Ikon
+                    nama="mail-outline"
+                    token={fokus === 'email' ? 'bw-blue' : 'bw-muted'}
+                    ukuran={18}
+                  />
+                  <TextInput
+                    value={email}
+                    onChangeText={(nilai) => {
+                      setEmail(nilai);
+                      if (galat) hapusGalat();
+                    }}
+                    onFocus={() => setFokus('email')}
+                    onBlur={() => setFokus(null)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    placeholder="nama@bawaslu.go.id"
+                    placeholderTextColor="#9a9aa0"
+                    accessibilityLabel="Email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => refSandi.current?.focus()}
+                    blurOnSubmit={false}
+                    className="flex-1 text-base text-bw-ink"
+                  />
+                </View>
               </View>
 
-              <View>
-                <Text className="mb-1.5 text-xs font-bold uppercase tracking-wide text-bw-muted">
+              <View className="mt-4">
+                <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
                   Kata sandi
                 </Text>
-                <TextInput
-                  value={sandi}
-                  onChangeText={(nilai) => {
-                    setSandi(nilai);
-                    if (galat) hapusGalat();
-                  }}
-                  secureTextEntry
-                  textContentType="password"
-                  placeholder="Kata sandi"
-                  placeholderTextColor="#9a9aa0"
-                  accessibilityLabel="Kata sandi"
-                  onSubmitEditing={kirim}
-                  returnKeyType="go"
-                  className="h-14 rounded-2xl border border-bw-line bg-bw-card px-4 text-base text-bw-ink"
-                />
+                <View
+                  className={`h-14 flex-row items-center gap-2.5 rounded-2xl border-2 bg-bw-surface pl-4 pr-1 ${
+                    fokus === 'sandi' ? 'border-bw-blue' : 'border-transparent'
+                  }`}
+                >
+                  <Ikon
+                    nama="lock-closed-outline"
+                    token={fokus === 'sandi' ? 'bw-blue' : 'bw-muted'}
+                    ukuran={18}
+                  />
+                  <TextInput
+                    ref={refSandi}
+                    value={sandi}
+                    onChangeText={(nilai) => {
+                      setSandi(nilai);
+                      if (galat) hapusGalat();
+                    }}
+                    onFocus={() => setFokus('sandi')}
+                    onBlur={() => setFokus(null)}
+                    secureTextEntry={!lihatSandi}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="password"
+                    textContentType="password"
+                    placeholder="Kata sandi"
+                    placeholderTextColor="#9a9aa0"
+                    accessibilityLabel="Kata sandi"
+                    onSubmitEditing={kirim}
+                    returnKeyType="go"
+                    className="flex-1 text-base text-bw-ink"
+                  />
+                  <Pressable
+                    onPress={() => setLihatSandi((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      lihatSandi ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'
+                    }
+                    hitSlop={8}
+                    className="h-12 w-12 items-center justify-center rounded-full active:opacity-70"
+                  >
+                    <Ikon
+                      nama={lihatSandi ? 'eye-off-outline' : 'eye-outline'}
+                      token="bw-muted"
+                      ukuran={20}
+                    />
+                  </Pressable>
+                </View>
               </View>
 
               {galat ? (
                 <View
                   accessibilityRole="alert"
-                  className="rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3"
+                  className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3"
                 >
-                  <Text className="text-sm leading-relaxed text-bw-red">
+                  <Ikon nama="alert-circle-outline" token="bw-red" ukuran={18} />
+                  <Text className="flex-1 text-sm leading-relaxed text-bw-red">
                     {galat}
                   </Text>
                 </View>
@@ -128,15 +192,18 @@ export default function LayarMasuk() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Masuk"
+                accessibilityState={{ disabled: !bisaKirim, busy: sibuk }}
                 onPress={kirim}
                 disabled={!bisaKirim}
-                className={`h-14 items-center justify-center rounded-2xl active:opacity-80 ${
-                  bisaKirim ? 'bg-bw-blue' : 'bg-bw-line'
+                android_ripple={bisaKirim ? { color: 'rgba(255,255,255,0.2)' } : undefined}
+                className={`mt-5 h-14 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80 ${
+                  bisaKirim || sibuk ? 'bg-bw-blue' : 'bg-bw-line'
                 }`}
               >
+                {sibuk ? <ActivityIndicator size="small" color="#ffffff" /> : null}
                 <Text
                   className={`text-base font-bold ${
-                    bisaKirim ? 'text-white' : 'text-bw-muted'
+                    bisaKirim || sibuk ? 'text-white' : 'text-bw-muted'
                   }`}
                 >
                   {sibuk ? 'Memeriksa...' : 'Masuk'}
@@ -144,10 +211,13 @@ export default function LayarMasuk() {
               </Pressable>
             </View>
 
-            <Text className="text-center text-xs leading-relaxed text-bw-muted">
-              Hanya untuk staf yang sudah terdaftar. Hubungi administrator bila
-              lupa kata sandi atau belum punya akun.
-            </Text>
+            <View className="mt-6 flex-row items-start justify-center gap-2 px-2">
+              <Text className="flex-1 text-center text-xs leading-relaxed text-bw-muted">
+              <Ikon nama="shield-checkmark-outline" token="bw-muted" ukuran={14} />
+                Hanya untuk staf yang sudah terdaftar. Hubungi administrator bila
+                lupa kata sandi atau belum punya akun.
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

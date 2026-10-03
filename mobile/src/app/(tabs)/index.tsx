@@ -144,7 +144,8 @@ export default function LayarBeranda() {
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}
         refreshControl={
           <RefreshControl
             refreshing={menyegarkan}
@@ -153,41 +154,45 @@ export default function LayarBeranda() {
           />
         }
       >
-        <View className="flex-row items-end justify-between">
-          <View>
-            <Text className="text-xl font-bold text-bw-ink">Jadwal</Text>
-            <Text className="mt-0.5 text-sm text-bw-muted">
-              {terlihat.length} ditampilkan
+        {/* Header */}
+        <View className="flex-row items-center justify-between">
+          <View className="min-w-0 flex-1 pr-3">
+            <Text className="text-3xl font-extrabold tracking-tight text-bw-ink">
+              Jadwal
+            </Text>
+            <Text className="mt-1 text-sm text-bw-muted">
+              {terlihat.length} jadwal ditampilkan
             </Text>
           </View>
 
           <View className="flex-row items-center gap-2">
             <Pressable
-              onPress={() => router.push('/jadwal/baru')}
-              accessibilityRole="button"
-              accessibilityLabel="Buat jadwal baru"
-              className="h-12 flex-1 items-center justify-center rounded-full bg-bw-blue active:opacity-80"
-            >
-              <Ikon nama="add" token="bw-blue-50" ukuran={19} />
-              <Text className="ml-1 text-sm font-bold text-white">Buat</Text>
-            </Pressable>
-
-            <Pressable
               onPress={segarkan}
               accessibilityRole="button"
               accessibilityLabel="Segarkan jadwal"
-              className="h-12 w-12 items-center justify-center rounded-full bg-bw-card active:opacity-70"
+              className="h-12 w-12 items-center justify-center rounded-full border border-bw-line bg-bw-card active:opacity-70"
             >
               <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/jadwal/baru')}
+              accessibilityRole="button"
+              accessibilityLabel="Buat jadwal baru"
+              className="h-12 flex-row items-center justify-center gap-1 rounded-full bg-bw-blue px-5 active:opacity-80"
+            >
+              <Ikon nama="add" token="bw-blue-50" ukuran={20} />
+              <Text className="text-sm font-bold text-white">Buat</Text>
             </Pressable>
           </View>
         </View>
 
+        {/* Filter divisi */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="mt-3"
-          contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+          className="-mx-5 mt-4 grow-0"
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
         >
           <FilterChip
             label="Semua"
@@ -204,65 +209,77 @@ export default function LayarBeranda() {
           ))}
         </ScrollView>
 
+        {/* Jadwal berikutnya */}
         {berikutnya ? (
-          <View className="mt-4 rounded-3xl border border-bw-blue-200 bg-bw-blue-50 p-4">
+          <View className="mt-5 rounded-[28px] bg-bw-blue p-5">
             <View className="flex-row items-center gap-2">
-              <Ikon nama="alarm" token="bw-blue" ukuran={16} />
-              <Text className="text-xs font-bold uppercase tracking-wide text-bw-blue-700">
+              <View className="h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                <Ikon nama="alarm" token="bw-blue-50" ukuran={16} />
+              </View>
+              <Text className="text-xs font-bold uppercase tracking-widest text-white/80">
                 Berikutnya
               </Text>
             </View>
-            <Text className="mt-1 text-base font-bold text-bw-ink">
+            <Text className="mt-3 text-xl font-extrabold text-white" numberOfLines={2}>
               {berikutnya.item.judul}
             </Text>
-            <Text className="mt-0.5 text-sm text-bw-blue-700">
-              {formatJam(berikutnya.sesi.mulai)} -{' '}
-              {formatSisa(new Date(berikutnya.sesi.mulai).getTime(), now)}
-            </Text>
+            <View className="mt-3 flex-row items-center self-start rounded-full bg-white/20 px-3 py-1.5">
+              <Text className="text-xs font-bold text-white">
+                {formatJam(berikutnya.sesi.mulai)} ·{' '}
+                {formatSisa(new Date(berikutnya.sesi.mulai).getTime(), now)}
+              </Text>
+            </View>
           </View>
         ) : null}
 
+        {/* Galat */}
         {galat ? (
           <View
             accessibilityRole="alert"
-            className="mt-4 rounded-3xl border border-bw-red-100 bg-bw-red-50 p-4"
+            className="mt-5 rounded-3xl border border-bw-red-100 bg-bw-red-50 p-4"
           >
-            <Text className="text-sm font-bold text-bw-red">
-              Jadwal tidak bisa dimuat.
-            </Text>
-            <Text className="mt-1 text-xs leading-relaxed text-bw-red">
-              {galat}
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <Ikon nama="alert-circle-outline" token="bw-red" ukuran={18} />
+              <Text className="text-sm font-bold text-bw-red">
+                Jadwal tidak bisa dimuat.
+              </Text>
+            </View>
+            <Text className="mt-1.5 text-xs leading-relaxed text-bw-red">{galat}</Text>
             <Pressable
               onPress={() => muatUlang()}
               accessibilityRole="button"
-              className="mt-3 h-12 items-center justify-center rounded-xl bg-bw-red-solid active:opacity-80"
+              className="mt-3 h-12 items-center justify-center rounded-2xl bg-bw-red-solid active:opacity-80"
             >
               <Text className="text-sm font-bold text-white">Coba lagi</Text>
             </Pressable>
           </View>
         ) : null}
 
+        {/* Memuat */}
         {memuat && terlihat.length === 0 ? (
-          <Text className="mt-8 text-center text-sm text-bw-muted">
+          <Text className="mt-10 text-center text-sm text-bw-muted">
             Memuat jadwal...
           </Text>
         ) : null}
 
+        {/* Kosong */}
         {!memuat && terlihat.length === 0 && !galat ? (
-          <View className="mt-8 items-center rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10">
-            <Ikon nama="calendar-outline" token="bw-muted" ukuran={32} />
-            <Text className="mt-3 text-sm font-bold text-bw-ink">
+          <View className="mt-8 items-center rounded-[28px] border border-dashed border-bw-line bg-bw-card px-6 py-12">
+            <View className="h-16 w-16 items-center justify-center rounded-full bg-bw-surface">
+              <Ikon nama="calendar-outline" token="bw-muted" ukuran={30} />
+            </View>
+            <Text className="mt-4 text-base font-bold text-bw-ink">
               Belum ada jadwal
             </Text>
-            <Text className="mt-1 text-center text-xs leading-relaxed text-bw-muted">
+            <Text className="mt-1.5 text-center text-xs leading-relaxed text-bw-muted">
               Belum ada pengingat yang perlu dipantau. Jadwal baru dibuat dari
               aplikasi web.
             </Text>
           </View>
         ) : null}
 
-        <View className="mt-4 gap-3">
+        {/* Daftar */}
+        <View className="mt-5 gap-3">
           {terlihat.map((item) => (
             <KartuJadwal
               key={item.id}
@@ -322,7 +339,7 @@ function FilterChip({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: aktif }}
-      className={`h-11 justify-center rounded-full border px-4 active:opacity-70 ${
+      className={`h-10 justify-center rounded-full border px-4 active:opacity-70 ${
         aktif ? 'border-bw-blue bg-bw-blue' : 'border-bw-line bg-bw-card'
       }`}
     >

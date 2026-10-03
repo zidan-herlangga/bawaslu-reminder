@@ -1,14 +1,16 @@
-import { Modal, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { Ikon } from './Ikon';
 
 // Dialog konfirmasi yang mengikuti tema aplikasi.
 //
 // Dialog bawaan Alert tidak bisa memakai warna aplikasi, dan tombolnya terlalu
-// kecil untuk jari:_context Apple HIG menyebut 44pt sebagai batas minimum,
-// dan di sini dipakai 56px supaya aman di layar kecil pun tidak meleset.
+// kecil untuk jari. Apple HIG menyebut 44pt sebagai batas minimum, dan di sini
+// dipakai 56 supaya aman di layar kecil pun.
 //
-// "Batal" diletakkan lebih dulu secara visual dan diberi gaya netral, supaya
-  // tindakan paling aman adalah yang paling mudah tidak sengaja terpilih.
+// "Batal" diletakkan di kiri dengan gaya netral, sedangkan tombol tindakan
+// berwarna mencolok di kanan. Selama proses berjalan (sibuk), dialog tidak
+// bisa ditutup lewat ketukan latar atau tombol Back, supaya orang tidak
+// mengira penghapusan dibatalkan padahal permintaannya sudah terkirim.
 
 export function DialogKonfirmasi({
   terbuka,
@@ -17,6 +19,7 @@ export function DialogKonfirmasi({
   labelBatal = 'Batal',
   labelSetuju = 'Hapus',
   sibuk = false,
+  bahaya = true,
   onBatal,
   onSetuju,
 }: {
@@ -26,56 +29,71 @@ export function DialogKonfirmasi({
   labelBatal?: string;
   labelSetuju?: string;
   sibuk?: boolean;
+  /** true (bawaan): gaya merah untuk tindakan merusak. false: gaya biru. */
+  bahaya?: boolean;
   onBatal: () => void;
   onSetuju: () => void;
 }) {
+  const tutup = () => {
+    if (!sibuk) onBatal();
+  };
+
   return (
     <Modal
       visible={terbuka}
       transparent
       animationType="fade"
-      onRequestClose={onBatal}
+      onRequestClose={tutup}
       statusBarTranslucent
     >
       <Pressable
-        className="flex-1 items-center justify-center bg-bw-ink/45 px-5"
-        onPress={onBatal}
+        accessible={false}
+        onPress={tutup}
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        className="flex-1 items-center justify-center px-6"
       >
         <Pressable
           accessibilityViewIsModal
           accessibilityRole="alert"
-          className="w-full max-w-sm rounded-3xl border border-bw-line bg-bw-card p-5"
+          className="w-full max-w-sm rounded-[28px] border border-bw-line bg-bw-card p-6"
           onPress={(peristiwa) => peristiwa.stopPropagation()}
         >
-          <View className="flex-row items-start gap-3">
-            <View className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-bw-red-50">
-              <Ikon nama="alert-circle" token="bw-red" ukuran={22} />
+          <View className="items-center">
+            <View
+              className={`h-16 w-16 items-center justify-center rounded-full ${
+                bahaya ? 'bg-bw-red-50' : 'bg-bw-blue-50'
+              }`}
+            >
+              <Ikon
+                nama={bahaya ? 'trash-outline' : 'help-circle-outline'}
+                token={bahaya ? 'bw-red' : 'bw-blue'}
+                ukuran={28}
+              />
             </View>
-            <View className="min-w-0 flex-1">
-              <Text className="text-base font-bold leading-snug text-bw-ink">
-                {judul}
-              </Text>
-              <Text className="mt-1 text-sm leading-relaxed text-bw-muted">
-                {pesan}
-              </Text>
-            </View>
+            <Text className="mt-4 text-center text-lg font-extrabold leading-snug text-bw-ink">
+              {judul}
+            </Text>
+            <Text className="mt-2 text-center text-sm leading-relaxed text-bw-muted">
+              {pesan}
+            </Text>
           </View>
 
-          <View className="mt-5 flex-row gap-2">
+          <View className="mt-6 flex-row gap-3">
             <TombolDialog
               label={labelBatal}
               onPress={onBatal}
-              className="flex-1 border border-bw-line bg-bw-card"
+              disabled={sibuk}
+              className="flex-1 border border-bw-line bg-bw-surface"
             />
             <TombolDialog
               label={sibuk ? 'Memproses...' : labelSetuju}
               onPress={onSetuju}
               disabled={sibuk}
-              // Tombol destruktif memakai latar merah pekat, jadi teksnya
-              // harus putih. --bw-red-solid sengaja dikunci di kedua tema
-              // supaya kontras ini selalu aman.
+              memuat={sibuk}
+              // Latar pekat, jadi teksnya putih. --bw-red-solid dikunci di
+              // kedua tema supaya kontras ini selalu aman.
               tokenTeks="bw-solid-text"
-              className="flex-1 bg-bw-red-solid"
+              className={`flex-1 ${bahaya ? 'bg-bw-red-solid' : 'bg-bw-blue'}`}
             />
           </View>
         </Pressable>
@@ -97,6 +115,7 @@ export function TombolDialog({
   label,
   onPress,
   disabled,
+  memuat = false,
   className = '',
   tokenTeks = 'bw-ink',
   onLongPress,
@@ -104,6 +123,7 @@ export function TombolDialog({
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  memuat?: boolean;
   className?: string;
   tokenTeks?: keyof typeof GAYA_TEKS;
   onLongPress?: () => void;
@@ -111,13 +131,17 @@ export function TombolDialog({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled), busy: memuat }}
       onPress={onPress}
       onLongPress={onLongPress}
       disabled={disabled}
-      className={`h-14 items-center justify-center rounded-xl active:opacity-80 ${
-        disabled ? 'opacity-50' : ''
+      android_ripple={{ color: 'rgba(128,128,128,0.2)' }}
+      className={`h-14 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80 ${
+        disabled && !memuat ? 'opacity-50' : ''
       } ${className}`}
     >
+      {memuat ? <ActivityIndicator size="small" color="#ffffff" /> : null}
       <Text className={`text-base font-bold ${GAYA_TEKS[tokenTeks]}`}>
         {label}
       </Text>

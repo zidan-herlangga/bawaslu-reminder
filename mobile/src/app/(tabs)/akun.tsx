@@ -7,12 +7,12 @@ import { useSesi } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { useTema, type PilihanTema } from '../../tema/TemaProvider';
 import {
+  alasanTidakBisaDipakai,
   cekIzinNotifikasi,
   mintaIzinNotifikasi,
   pesanStatus,
   type StatusNotifikasi,
 } from '../../lib/notifikasi';
-import { alasanTidakBisaDipakai } from '../../lib/notifikasi';
 
 // Akun: profil, tema, dan notifikasi.
 //
@@ -27,6 +27,8 @@ interface Profil {
   divisi: string | null;
   role_akses: string | null;
 }
+
+type NamaIkon = Parameters<typeof Ikon>[0]['nama'];
 
 export default function LayarAkun() {
   const { session, keluar } = useSesi();
@@ -100,30 +102,50 @@ export default function LayarAkun() {
     ]);
   }, [keluar]);
 
+  const subjudulProfil = [profil?.jabatan, profil?.divisi].filter(Boolean).join(' · ');
+
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        <Text className="text-xl font-bold text-bw-ink">Akun</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}
+      >
+        <Text className="text-3xl font-extrabold tracking-tight text-bw-ink">Akun</Text>
+        <Text className="mt-1 text-sm text-bw-muted">
+          Kelola profil, tampilan, dan notifikasi.
+        </Text>
 
-        <View className="mt-4 items-center rounded-3xl border border-bw-line bg-bw-card p-5">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-bw-blue-50">
-            <Text className="text-xl font-bold text-bw-blue-700">
-              {inisial(profil?.nama_lengkap ?? session?.user.email)}
-            </Text>
-          </View>
-          <Text className="mt-3 text-center text-base font-bold text-bw-ink">
-            {profil?.nama_lengkap ?? 'Nama belum dilengkapi'}
-          </Text>
-          <Text className="mt-0.5 text-center text-sm text-bw-muted">
-            {session?.user.email}
-          </Text>
-          {profil?.role_akses ? (
-            <View className="mt-3 rounded-full bg-bw-surface px-3 py-1">
-              <Text className="text-xs font-bold text-bw-ink-2">
-                {profil.role_akses}
+        {/* Kartu profil */}
+        <View className="mt-5 overflow-hidden rounded-[28px] border border-bw-line bg-bw-card">
+          <View className="h-20 bg-bw-blue-50" />
+          <View className="-mt-10 items-center px-5 pb-6">
+            <View className="h-20 w-20 items-center justify-center rounded-full border-4 border-bw-card bg-bw-blue">
+              <Text className="text-2xl font-extrabold text-white">
+                {inisial(profil?.nama_lengkap ?? session?.user.email)}
               </Text>
             </View>
-          ) : null}
+
+            <Text className="mt-3 text-center text-lg font-bold text-bw-ink">
+              {profil?.nama_lengkap ?? 'Nama belum dilengkapi'}
+            </Text>
+            <Text className="mt-0.5 text-center text-sm text-bw-muted">
+              {session?.user.email}
+            </Text>
+
+            {subjudulProfil ? (
+              <Text className="mt-1 text-center text-xs text-bw-muted">
+                {subjudulProfil}
+              </Text>
+            ) : null}
+
+            {profil?.role_akses ? (
+              <View className="mt-3 rounded-full bg-bw-blue-50 px-3.5 py-1.5">
+                <Text className="text-xs font-bold uppercase tracking-wide text-bw-blue-700">
+                  {profil.role_akses}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         <Bagian judul="Tampilan">
@@ -133,19 +155,22 @@ export default function LayarAkun() {
           />
         </Bagian>
 
-        <Bagian judul="Notifikasi">
+        <Bagian
+          judul="Notifikasi"
+          catatan={
+            izinNotifikasi === 'ekspo-go'
+              ? alasanTidakBisaDipakai() ??
+                'Notifikasi tidak tersedia di lingkungan ini.'
+              : 'Izin hanya diminta satu kali. Menolaknya berarti pengingat tidak akan sampai saat aplikasi ditutup.'
+          }
+        >
           <Baris
             ikon="notifications-outline"
             judul="Izin notifikasi"
             keterangan={pesanStatus(izinNotifikasi)}
             onTekan={izinNotifikasi === 'ekspo-go' ? undefined : mintaIzin}
+            terakhir
           />
-          <Text className="mt-2 text-xs leading-relaxed text-bw-muted">
-            {izinNotifikasi === 'ekspo-go'
-              ? alasanTidakBisaDipakai() ??
-                'Notifikasi tidak tersedia di lingkungan ini.'
-              : 'Izin hanya diminta satu kali. Menolaknya berarti pengingat tidak akan sampai saat aplikasi ditutup.'}
-          </Text>
         </Bagian>
 
         <Bagian judul="Aplikasi">
@@ -156,6 +181,7 @@ export default function LayarAkun() {
             keterangan="Hapus sesi dari perangkat"
             bahaya
             onTekan={konfirmasiKeluar}
+            terakhir
           />
         </Bagian>
       </ScrollView>
@@ -163,15 +189,26 @@ export default function LayarAkun() {
   );
 }
 
-function Bagian({ judul, children }: { judul: string; children: React.ReactNode }) {
+function Bagian({
+  judul,
+  catatan,
+  children,
+}: {
+  judul: string;
+  catatan?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <View className="mt-6">
-      <Text className="mb-2 text-xs font-bold uppercase tracking-wide text-bw-muted">
+    <View className="mt-7">
+      <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
         {judul}
       </Text>
       <View className="overflow-hidden rounded-3xl border border-bw-line bg-bw-card">
         {children}
       </View>
+      {catatan ? (
+        <Text className="ml-1 mt-2 text-xs leading-relaxed text-bw-muted">{catatan}</Text>
+      ) : null}
     </View>
   );
 }
@@ -182,32 +219,35 @@ function Baris({
   keterangan,
   onTekan,
   bahaya = false,
+  terakhir = false,
 }: {
-  ikon: Parameters<typeof Ikon>[0]['nama'];
+  ikon: NamaIkon;
   judul: string;
   keterangan: string;
   onTekan?: () => void;
   bahaya?: boolean;
+  terakhir?: boolean;
 }) {
   return (
     <Pressable
       onPress={onTekan}
       disabled={!onTekan}
       accessibilityRole={onTekan ? 'button' : 'text'}
-      className="min-h-14 flex-row items-center gap-3 border-b border-bw-line px-4 py-3 active:opacity-70"
+      android_ripple={onTekan ? { color: 'rgba(0,0,0,0.06)' } : undefined}
+      className={`min-h-16 flex-row items-center gap-3.5 px-4 py-3 active:opacity-70 ${
+        terakhir ? '' : 'border-b border-bw-line'
+      }`}
     >
-      <Ikon
-        nama={ikon}
-        ukuran={20}
-        token={bahaya ? 'bw-red' : 'bw-muted'}
-      />
+      <View className="h-10 w-10 items-center justify-center rounded-2xl bg-bw-surface">
+        <Ikon nama={ikon} ukuran={20} token={bahaya ? 'bw-red' : 'bw-blue'} />
+      </View>
       <View className="min-w-0 flex-1">
         <Text
-          className={`text-sm font-semibold ${bahaya ? 'text-bw-red' : 'text-bw-ink'}`}
+          className={`text-[15px] font-semibold ${bahaya ? 'text-bw-red' : 'text-bw-ink'}`}
         >
           {judul}
         </Text>
-        <Text className="text-xs text-bw-muted">{keterangan}</Text>
+        <Text className="mt-0.5 text-xs text-bw-muted">{keterangan}</Text>
       </View>
       {onTekan ? <Ikon nama="chevron-forward" ukuran={16} token="bw-muted" /> : null}
     </Pressable>
@@ -221,37 +261,38 @@ function PilihanTema({
   nilai: PilihanTema;
   onPilih: (nilai: string) => void;
 }) {
-  const opsi: { kunci: PilihanTema; label: string; ikon: 'sunny' | 'moon' | 'phone-portrait' }[] = [
+  const daftar: { kunci: PilihanTema; label: string; ikon: 'sunny' | 'moon' | 'phone-portrait' }[] = [
     { kunci: 'terang', label: 'Terang', ikon: 'sunny' },
     { kunci: 'gelap', label: 'Gelap', ikon: 'moon' },
     { kunci: 'sistem', label: 'Sistem', ikon: 'phone-portrait' },
   ];
 
   return (
-    <View className="flex-row gap-2 p-3">
-      {opsi.map((opsi) => {
-        const aktif = nilai === opsi.kunci;
+    <View
+      accessibilityRole="radiogroup"
+      className="flex-row gap-2 p-3"
+    >
+      {daftar.map((item) => {
+        const aktif = nilai === item.kunci;
         return (
           <Pressable
-            key={opsi.kunci}
-            onPress={() => onPilih(opsi.kunci)}
+            key={item.kunci}
+            onPress={() => onPilih(item.kunci)}
             accessibilityRole="radio"
             accessibilityState={{ selected: aktif }}
-            className={`flex-1 items-center gap-1.5 rounded-2xl border py-3 active:opacity-70 ${
-              aktif
-                ? 'border-bw-blue bg-bw-blue-50'
-                : 'border-bw-line bg-bw-surface'
+            className={`flex-1 items-center gap-2 rounded-2xl border-2 py-3.5 active:opacity-70 ${
+              aktif ? 'border-bw-blue bg-bw-blue-50' : 'border-transparent bg-bw-surface'
             }`}
           >
             <Ikon
-              nama={opsi.ikon}
-              ukuran={20}
+              nama={item.ikon}
+              ukuran={22}
               token={aktif ? 'bw-blue' : 'bw-muted'}
             />
             <Text
               className={`text-xs font-bold ${aktif ? 'text-bw-blue-700' : 'text-bw-ink-2'}`}
             >
-              {opsi.label}
+              {item.label}
             </Text>
           </Pressable>
         );
@@ -265,4 +306,3 @@ function inisial(nama: string | null | undefined): string {
   const bagian = nama.trim().split(/\s+/).slice(0, 2);
   return bagian.map((kata) => kata.charAt(0).toUpperCase()).join('');
 }
-

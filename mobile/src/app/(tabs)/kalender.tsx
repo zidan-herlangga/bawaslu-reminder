@@ -1,6 +1,3 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,10 +5,7 @@ import { Ikon } from '../../komponen/Ikon';
 import { Lencana, LencanaSelesai } from '../../komponen/Lencana';
 import { useSesi } from '../../lib/session';
 import { useJadwal } from '../../lib/useJadwal';
-import {
-  formatJam,
-  formatTanggalPanjang,
-} from '../../shared/formatWaktu';
+import { formatJam, formatTanggalPanjang } from '../../shared/formatWaktu';
 import {
   sesiSelesai,
   slotDayKey,
@@ -20,25 +14,52 @@ import {
 } from '../../shared/slots';
 import { gayaKategori } from '../../komponen/gaya';
 
-// Agenda: daftar jadwal per tanggal.
+// Agenda: kalender bulanan + daftar jadwal per tanggal.
 //
-// Kenapa agenda, bukan grid bulan seperti di web:
-//
-// Di layar HP, grid bulan membuat setiap sel hanya beberapa sentimeter. Orang
-// harus mengecar angka yang tepat untuk tahu ada jadwal atau tidak, dan nama
-// jadwal tidak pernah muat di sana. Agenda menjawab pertanyaan yang sama
-// ("hari ini ada apa") dengan jauh lebih cepat, dan navigasi tetap tersedia
-// lewat pemilih tanggal yang_native.
+// Kalender dibuat sendiri (tanpa library tambahan) supaya tidak menambah
+// dependensi native. Setiap sel hanya menampilkan tanggal dan satu titik
+// penanda jika ada jadwal. Nama jadwal tidak dipaksakan muat di sel; detailnya
+// ada di daftar di bawah kalender, yang menjawab "hari ini ada apa" lebih cepat.
 //
 // Jadwal yang waktunya sudah lewat tetap ditampilkan, dengan lencana Selesai
-// dan waktu yang dip strikes. Menyingkirkannya membuat orang mengira agenda
-// salah tanggal.
+// dan warna redup. Menyingkirkannya membuat orang mengira agenda salah tanggal.
 
 const KELIP_MS = 30 * 1000;
+
+const NAMA_BULAN = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+// Pekan dimulai Senin, sesuai kebiasaan di Indonesia.
+const NAMA_HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 interface Baris {
   jadwal: Jadwal;
   sesi: Slot;
+}
+
+function awalBulan(tanggal: Date): Date {
+  return new Date(tanggal.getFullYear(), tanggal.getMonth(), 1);
+}
+
+function kunciTanggal(tanggal: Date): string {
+  return slotDayKey(tanggal.toISOString());
+}
+
+/** Menyusun sel kalender: null untuk kotak kosong sebelum tanggal 1. */
+function susunSel(bulan: Date): (Date | null)[] {
+  const tahun = bulan.getFullYear();
+  const bln = bulan.getMonth();
+  const jumlahHari = new Date(tahun, bln + 1, 0).getDate();
+  // getDay(): 0 = Minggu. Diubah supaya Senin = 0.
+  const geser = (new Date(tahun, bln, 1).getDay() + 6) % 7;
+
+  const sel: (Date | null)[] = Array.from({ length: geser }, () => null);
+  for (let hari = 1; hari <= jumlahHari; hari++) {
+    sel.push(new Date(tahun, bln, hari, 12));
+  }
+  while (sel.length % 7 !== 0) sel.push(null);
+  return sel;
 }
 
 export default function LayarAgenda() {
@@ -48,7 +69,8 @@ export default function LayarAgenda() {
   const { jadwal, memuat, muatUlang } = useJadwal(userId);
 
   const [terpilih, setTerpilih] = useState(() => new Date());
-  const [bukaPemilih, setBukaPemilih] = useState(false);
+  const [bulanTampil, setBulanTampil] = useState(() => awalBulan(new Date()));
+  const [kalenderTerbuka, setKalenderTerbuka] = useState(true);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -56,22 +78,48 @@ export default function LayarAgenda() {
     return () => clearInterval(timer);
   }, []);
 
+  // Kalau tanggal terpilih berpindah bulan (lewat tombol hari atau "Hari ini"),
+  // kalender ikut berpindah.
+  useEffect(() => {
+    setBulanTampil(awalBulan(terpilih));
+  }, [terpilih]);
+
   const hariIni = slotDayKey(new Date(now).toISOString());
+  const kunciTerpilih = kunciTanggal(terpilih);
+
+  // Jumlah sesi per tanggal, dipakai untuk titik penanda di kalender.
+  const jumlahPerHari = useMemo(() => {
+    const peta = new Map<string, number>();
+    const tambah = (iso: string) => {
+      const kunci = slotDayKey(iso);
+      peta.set(kunci, (peta.get(kunci) ?? 0) + 1);
+    };
+
+    for (const item of jadwal) {
+      const sesi = Array.isArray(item.slots) ? item.slots : [];
+      for (const slot of sesi) {
+        if (slot?.mulai) tambah(slot.mulai);
+      }
+      if (sesi.length === 0 && item.waktu_mulai) tambah(item.waktu_mulai);
+    }
+    return peta;
+  }, [jadwal]);
 
   const baris = useMemo(() => {
     const hasil: Baris[] = [];
-    const kunci = slotDayKey(terpilih.toISOString());
 
     for (const item of jadwal) {
       const sesi = Array.isArray(item.slots) ? item.slots : [];
       for (const slot of sesi) {
         if (!slot?.mulai) continue;
-        if (slotDayKey(slot.mulai) === kunci) hasil.push({ jadwal: item, sesi: slot });
+        if (slotDayKey(slot.mulai) === kunciTerpilih) {
+          hasil.push({ jadwal: item, sesi: slot });
+        }
       }
 
       // Jadwal tanpa daftar sesi tetap punya waktu_mulai sendiri.
       if (sesi.length === 0 && item.waktu_mulai) {
-        if (slotDayKey(item.waktu_mulai) === kunci) {
+        if (slotDayKey(item.waktu_mulai) === kunciTerpilih) {
           hasil.push({
             jadwal: item,
             sesi: { mulai: item.waktu_mulai, selesai: item.waktu_selesai },
@@ -91,12 +139,7 @@ export default function LayarAgenda() {
       const mulaiB = new Date(b.sesi.mulai).getTime();
       return lewatA ? mulaiB - mulaiA : mulaiA - mulaiB;
     });
-  }, [jadwal, terpilih, now]);
-
-  const gantiTanggal = useCallback((peristiwa: DateTimePickerEvent, tanggal?: Date) => {
-    setBukaPemilih(false);
-    if (tanggal) setTerpilih(tanggal);
-  }, []);
+  }, [jadwal, kunciTerpilih, now]);
 
   const geserHari = useCallback((nilai: number) => {
     setTerpilih((sebelumnya) => {
@@ -106,88 +149,235 @@ export default function LayarAgenda() {
     });
   }, []);
 
-  const keHariSebelumnya = useCallback(() => geserHari(-1), [geserHari]);
+  const geserBulan = useCallback((nilai: number) => {
+    setBulanTampil((sebelumnya) =>
+      new Date(sebelumnya.getFullYear(), sebelumnya.getMonth() + nilai, 1)
+    );
+  }, []);
+
+  const sel = useMemo(() => susunSel(bulanTampil), [bulanTampil]);
+  const pekan = useMemo(() => {
+    const hasil: (Date | null)[][] = [];
+    for (let i = 0; i < sel.length; i += 7) hasil.push(sel.slice(i, i + 7));
+    return hasil;
+  }, [sel]);
+
+  const sudahHariIni = kunciTerpilih === hariIni;
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
-      <View className="border-b border-bw-line bg-bw-card px-4 pb-3 pt-4">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}
+      >
+        {/* Header */}
         <View className="flex-row items-center justify-between">
-          <Text className="text-xl font-bold text-bw-ink">Agenda</Text>
+          <View className="min-w-0 flex-1 pr-3">
+            <Text className="text-3xl font-extrabold tracking-tight text-bw-ink">
+              Agenda
+            </Text>
+            <Text className="mt-1 text-sm text-bw-muted">
+              Pilih tanggal untuk melihat jadwal.
+            </Text>
+          </View>
+
           <Pressable
             onPress={() => setTerpilih(new Date())}
             accessibilityRole="button"
             accessibilityLabel="Kembali ke hari ini"
-            disabled={slotDayKey(terpilih.toISOString()) === hariIni}
-            className="h-11 justify-center rounded-full border border-bw-line px-4 active:opacity-70 disabled:opacity-40"
+            disabled={sudahHariIni}
+            className={`h-11 justify-center rounded-full border px-4 active:opacity-70 ${
+              sudahHariIni
+                ? 'border-bw-line bg-bw-card opacity-50'
+                : 'border-bw-blue bg-bw-blue-50'
+            }`}
           >
-            <Text className="text-xs font-bold text-bw-ink-2">Hari ini</Text>
+            <Text
+              className={`text-xs font-bold ${
+                sudahHariIni ? 'text-bw-ink-2' : 'text-bw-blue-700'
+              }`}
+            >
+              Hari ini
+            </Text>
           </Pressable>
         </View>
 
-        <View className="mt-3 flex-row items-center justify-between gap-2">
-          <Pressable
-            onPress={keHariSebelumnya}
-            accessibilityRole="button"
-            accessibilityLabel="Hari sebelumnya"
-            className="h-12 w-12 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
-          >
-            <Ikon nama="chevron-back" token="bw-ink-2" ukuran={20} />
-          </Pressable>
+        {/* Kalender */}
+        <View className="mt-5 rounded-[28px] border border-bw-line bg-bw-card p-4">
+          <View className="flex-row items-center justify-between">
+            <Pressable
+              onPress={() => geserBulan(-1)}
+              accessibilityRole="button"
+              accessibilityLabel="Bulan sebelumnya"
+              className="h-11 w-11 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
+            >
+              <Ikon nama="chevron-back" token="bw-ink-2" ukuran={20} />
+            </Pressable>
 
-          <Pressable
-            onPress={() => setBukaPemilih(true)}
-            accessibilityRole="button"
-            className="flex-1 items-center py-2"
-          >
-            <Text className="text-center text-sm font-bold text-bw-ink">
+            <Pressable
+              onPress={() => setKalenderTerbuka((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={kalenderTerbuka ? 'Lipat kalender' : 'Buka kalender'}
+              className="flex-1 flex-row items-center justify-center gap-1.5 py-2 active:opacity-70"
+            >
+              <Text className="text-base font-extrabold text-bw-ink">
+                {NAMA_BULAN[bulanTampil.getMonth()]} {bulanTampil.getFullYear()}
+              </Text>
+              <Ikon
+                nama={kalenderTerbuka ? 'chevron-up' : 'chevron-down'}
+                token="bw-muted"
+                ukuran={14}
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={() => geserBulan(1)}
+              accessibilityRole="button"
+              accessibilityLabel="Bulan berikutnya"
+              className="h-11 w-11 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
+            >
+              <Ikon nama="chevron-forward" token="bw-ink-2" ukuran={20} />
+            </Pressable>
+          </View>
+
+          {kalenderTerbuka ? (
+            <View className="mt-3">
+              <View className="flex-row">
+                {NAMA_HARI.map((hari, indeks) => (
+                  <View key={hari} className="flex-1 items-center py-1.5">
+                    <Text
+                      className={`text-[11px] font-bold uppercase tracking-wide ${
+                        indeks === 6 ? 'text-bw-red' : 'text-bw-muted'
+                      }`}
+                    >
+                      {hari}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {pekan.map((minggu, indeksPekan) => (
+                <View key={indeksPekan} className="flex-row">
+                  {minggu.map((tanggal, indeksHari) => {
+                    if (!tanggal) {
+                      return <View key={indeksHari} className="h-12 flex-1" />;
+                    }
+
+                    const kunci = kunciTanggal(tanggal);
+                    const aktif = kunci === kunciTerpilih;
+                    const adalahHariIni = kunci === hariIni;
+                    const jumlah = jumlahPerHari.get(kunci) ?? 0;
+
+                    return (
+                      <Pressable
+                        key={indeksHari}
+                        onPress={() => setTerpilih(tanggal)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${tanggal.getDate()} ${
+                          NAMA_BULAN[tanggal.getMonth()]
+                        }${jumlah > 0 ? `, ${jumlah} jadwal` : ''}`}
+                        accessibilityState={{ selected: aktif }}
+                        className="h-12 flex-1 items-center justify-center"
+                      >
+                        <View
+                          className={`h-10 w-10 items-center justify-center rounded-full ${
+                            aktif
+                              ? 'bg-bw-blue'
+                              : adalahHariIni
+                                ? 'border border-bw-blue bg-bw-blue-50'
+                                : ''
+                          }`}
+                        >
+                          <Text
+                            className={`text-sm ${
+                              aktif
+                                ? 'font-extrabold text-white'
+                                : adalahHariIni
+                                  ? 'font-extrabold text-bw-blue-700'
+                                  : indeksHari === 6
+                                    ? 'font-semibold text-bw-red'
+                                    : 'font-semibold text-bw-ink'
+                            }`}
+                          >
+                            {tanggal.getDate()}
+                          </Text>
+                          {jumlah > 0 ? (
+                            <View
+                              className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+                                aktif ? 'bg-white' : 'bg-bw-blue'
+                              }`}
+                            />
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View className="mt-3 flex-row items-center justify-between rounded-2xl bg-bw-surface px-3 py-2">
+              <Pressable
+                onPress={() => geserHari(-1)}
+                accessibilityRole="button"
+                accessibilityLabel="Hari sebelumnya"
+                className="h-10 w-10 items-center justify-center rounded-full active:opacity-70"
+              >
+                <Ikon nama="chevron-back" token="bw-ink-2" ukuran={18} />
+              </Pressable>
+              <Text className="flex-1 text-center text-sm font-bold text-bw-ink">
+                {formatTanggalPanjang(terpilih.toISOString())}
+              </Text>
+              <Pressable
+                onPress={() => geserHari(1)}
+                accessibilityRole="button"
+                accessibilityLabel="Hari berikutnya"
+                className="h-10 w-10 items-center justify-center rounded-full active:opacity-70"
+              >
+                <Ikon nama="chevron-forward" token="bw-ink-2" ukuran={18} />
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {/* Judul daftar */}
+        <View className="mt-6 flex-row items-end justify-between">
+          <View className="min-w-0 flex-1 pr-3">
+            <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
+              {sudahHariIni ? 'Hari ini' : 'Tanggal dipilih'}
+            </Text>
+            <Text className="mt-1 text-lg font-extrabold text-bw-ink">
               {formatTanggalPanjang(terpilih.toISOString())}
             </Text>
-            <View className="mt-0.5 flex-row items-center gap-1">
-              <Ikon nama="calendar-outline" token="bw-muted" ukuran={13} />
-              <Text className="text-xs text-bw-muted">Ubah tanggal</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            onPress={() => geserHari(1)}
-            accessibilityRole="button"
-            accessibilityLabel="Hari berikutnya"
-            className="h-12 w-12 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
-          >
-            <Ikon nama="chevron-forward" token="bw-ink-2" ukuran={20} />
-          </Pressable>
+          </View>
+          <View className="rounded-full bg-bw-blue-50 px-3 py-1.5">
+            <Text className="text-xs font-bold text-bw-blue-700">
+              {baris.length} jadwal
+            </Text>
+          </View>
         </View>
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        {bukaPemilih ? (
-          <DateTimePicker
-            value={terpilih}
-            mode="date"
-            onChange={gantiTanggal}
-            maximumDate={new Date(2100, 0, 1)}
-          />
-        ) : null}
 
         {memuat && baris.length === 0 ? (
-          <Text className="mt-8 text-center text-sm text-bw-muted">
+          <Text className="mt-10 text-center text-sm text-bw-muted">
             Memuat jadwal...
           </Text>
         ) : null}
 
         {!memuat && baris.length === 0 ? (
-          <View className="mt-8 items-center rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10">
-            <Ikon nama="calendar-clear-outline" token="bw-muted" ukuran={32} />
-            <Text className="mt-3 text-sm font-bold text-bw-ink">
+          <View className="mt-4 items-center rounded-[28px] border border-dashed border-bw-line bg-bw-card px-6 py-12">
+            <View className="h-16 w-16 items-center justify-center rounded-full bg-bw-surface">
+              <Ikon nama="calendar-clear-outline" token="bw-muted" ukuran={30} />
+            </View>
+            <Text className="mt-4 text-base font-bold text-bw-ink">
               Tidak ada jadwal
             </Text>
-            <Text className="mt-1 text-center text-xs leading-relaxed text-bw-muted">
+            <Text className="mt-1.5 text-center text-xs leading-relaxed text-bw-muted">
               Tanggal ini masih kosong.
             </Text>
           </View>
         ) : null}
 
-        <View className="gap-2.5">
+        <View className="mt-4 gap-3">
           {baris.map(({ jadwal: item, sesi }) => (
             <BarisAgenda
               key={`${item.id}-${sesi.mulai}`}
@@ -202,8 +392,9 @@ export default function LayarAgenda() {
         <Pressable
           onPress={() => muatUlang({ senyap: true })}
           accessibilityRole="button"
-          className="mt-6 h-12 items-center justify-center rounded-xl bg-bw-card active:opacity-70"
+          className="mt-6 h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-bw-line bg-bw-card active:opacity-70"
         >
+          <Ikon nama="refresh" token="bw-ink-2" ukuran={18} />
           <Text className="text-sm font-bold text-bw-ink-2">Muat ulang</Text>
         </Pressable>
       </ScrollView>
@@ -229,23 +420,30 @@ function BarisAgenda({
     <Pressable
       onPress={onTekan}
       accessibilityRole="button"
-      className={`overflow-hidden rounded-2xl border border-bw-line bg-bw-card p-3.5 active:opacity-70 ${
+      android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+      className={`flex-row overflow-hidden rounded-3xl border border-bw-line bg-bw-card active:opacity-70 ${
         lewat ? 'opacity-70' : ''
       }`}
     >
-      <View className="flex-row items-center gap-3">
-        <View className="min-w-16 items-center">
+      <View className={`w-1.5 ${lewat ? 'bg-bw-line' : 'bg-bw-blue'}`} />
+
+      <View className="flex-1 flex-row items-center gap-3 p-4">
+        <View className="min-w-14 items-center">
           <Text
-            className={`text-base font-bold ${
+            className={`text-base font-extrabold ${
               lewat ? 'text-bw-muted' : 'text-bw-ink'
             }`}
           >
             {formatJam(sesi.mulai)}
           </Text>
           {sesi.selesai ? (
-            <Text className="text-xs text-bw-muted">{formatJam(sesi.selesai)}</Text>
+            <Text className="mt-0.5 text-xs text-bw-muted">
+              {formatJam(sesi.selesai)}
+            </Text>
           ) : null}
         </View>
+
+        <View className="h-10 w-px bg-bw-line" />
 
         <View className="min-w-0 flex-1">
           <View className="flex-row flex-wrap items-center gap-1.5">
@@ -253,7 +451,7 @@ function BarisAgenda({
             {lewat ? <LencanaSelesai /> : null}
           </View>
           <Text
-            className={`mt-1 text-sm font-bold leading-snug ${
+            className={`mt-1.5 text-[15px] font-bold leading-snug ${
               lewat ? 'text-bw-muted' : 'text-bw-ink'
             }`}
           >

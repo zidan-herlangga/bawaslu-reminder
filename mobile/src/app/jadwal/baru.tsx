@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FormJadwal, { type ProfilPembuat } from '../../komponen/FormJadwal';
 import { Ikon } from '../../komponen/Ikon';
@@ -11,15 +11,15 @@ import { formKosong, type FormJadwal as BentukForm } from '../../shared/validasi
 // Route tambah jadwal.
 //
 // Seluruh formulirnya ada di komponen FormJadwal, yang juga dipakai oleh
-// layar ubah. Route ini hanya--|IThing ambil sesi, profil, lalu
-// menyerahkan ke komponen.
+// layar ubah. Route ini hanya mengambil sesi dan profil, lalu menyerahkannya
+// ke komponen tersebut.
 
 export default function LayarBuatJadwal() {
   const router = useRouter();
   const { session, loading } = useSesi();
   const userId = session?.user.id ?? '';
 
-  const [nilaiAwal, setNilaiAwal] = useState<BentukForm>(() => formKosong());
+  const [nilaiAwal] = useState<BentukForm>(() => formKosong());
   const [profil, setProfil] = useState<ProfilPembuat>({
     namaLengkap: null,
     divisi: null,
@@ -27,7 +27,10 @@ export default function LayarBuatJadwal() {
   const [siap, setSiap] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) return undefined;
+
+    // Mencegah setState setelah layar ditutup sebelum profil selesai dimuat.
+    let dibatalkan = false;
 
     supabase
       .from('profiles')
@@ -35,13 +38,30 @@ export default function LayarBuatJadwal() {
       .eq('id', userId)
       .maybeSingle()
       .then(({ data }) => {
+        if (dibatalkan) return;
         setProfil({
           namaLengkap: (data?.nama_lengkap as string | null) ?? null,
           divisi: (data?.divisi as string | null) ?? null,
         });
         setSiap(true);
       });
+
+    return () => {
+      dibatalkan = true;
+    };
   }, [userId]);
+
+  // Tanpa sesi, profil tidak akan pernah dimuat. Tanpa cabang ini layar akan
+  // menampilkan "Menyiapkan formulir..." selamanya.
+  if (!loading && !session) {
+    return (
+      <LayarGalat
+        judul="Sesi tidak ditemukan"
+        pesan="Silakan masuk kembali untuk membuat jadwal."
+        onTutup={() => router.back()}
+      />
+    );
+  }
 
   if (loading || !siap) {
     return (
@@ -74,14 +94,26 @@ export function LayarTunggu({
 }) {
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top', 'bottom']}>
-      <View className="flex-1 items-center justify-center gap-4 px-6">
-        <Text className="text-center text-sm text-bw-muted">{pesan}</Text>
+      <View className="flex-1 items-center justify-center px-8">
+        <View className="h-20 w-20 items-center justify-center rounded-full bg-bw-blue-50">
+          <ActivityIndicator size="large" color="#0071e3" />
+        </View>
+        <Text className="mt-5 text-center text-base font-bold text-bw-ink">
+          {pesan}
+        </Text>
+        <Text className="mt-1.5 text-center text-xs leading-relaxed text-bw-muted">
+          Mohon tunggu sebentar.
+        </Text>
+
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Kembali"
           onPress={onTutup}
-          className="h-14 items-center justify-center rounded-2xl border border-bw-line bg-bw-card px-5 active:opacity-80"
+          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+          className="mt-8 h-12 flex-row items-center justify-center gap-1.5 rounded-full border border-bw-line bg-bw-card px-6 active:opacity-70"
         >
-          <Text className="text-base font-bold text-bw-ink-2">Kembali</Text>
+          <Ikon nama="chevron-back" token="bw-ink-2" ukuran={16} />
+          <Text className="text-sm font-bold text-bw-ink-2">Kembali</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -99,16 +131,23 @@ export function LayarGalat({
 }) {
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top', 'bottom']}>
-      <View className="flex-1 items-center justify-center gap-4 px-6">
-        <Ikon nama="alert-circle" token="bw-red" ukuran={36} />
-        <Text className="text-center text-lg font-bold text-bw-ink">{judul}</Text>
-        <Text className="text-center text-sm leading-relaxed text-bw-muted">
+      <View className="flex-1 items-center justify-center px-8">
+        <View className="h-20 w-20 items-center justify-center rounded-full bg-bw-red-50">
+          <Ikon nama="alert-circle" token="bw-red" ukuran={40} />
+        </View>
+        <Text className="mt-5 text-center text-xl font-extrabold text-bw-ink">
+          {judul}
+        </Text>
+        <Text className="mt-2 text-center text-sm leading-relaxed text-bw-muted">
           {pesan}
         </Text>
+
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Kembali"
           onPress={onTutup}
-          className="mt-2 h-14 items-center justify-center rounded-2xl bg-bw-blue px-6 active:opacity-80"
+          android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+          className="mt-8 h-14 w-full max-w-xs items-center justify-center rounded-2xl bg-bw-blue active:opacity-80"
         >
           <Text className="text-base font-bold text-white">Kembali</Text>
         </Pressable>

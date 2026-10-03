@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatJam, formatTanggalPendek, formatWaktuLengkap } from '../shared/formatWaktu';
 import { namaDivisi } from '../shared/options';
 import { sesiSelesai, sortSlots, type Jadwal, type Slot } from '../shared/slots';
-import { Ikon } from './Ikon';
+import type { TokenWarna } from '../tema/warna';
+import { Ikon, type NamaIkon } from './Ikon';
 import { Lencana, LencanaSelesai, LencanaStatus } from './Lencana';
-import { TombolDialog } from './DialogKonfirmasi';
 import { gayaKategori } from './gaya';
 
 // Modal detail jadwal.
@@ -15,7 +17,11 @@ import { gayaKategori } from './gaya';
 // tanpa mengubah tinggi halaman di belakang.
 //
 // Sesi yang sedang dibuka ditandai, supaya tidak tertukar dengan sesi lain di
-// hari yang sama.
+// hari yang sama. Memilih sesi lain mengubah tampilan di modal ini sendiri,
+// jadi pemanggil tidak wajib menyediakan onPilihSesi.
+//
+// Footer memakai inset bawah perangkat supaya tombol tidak mepet atau tertutup
+// tombol navigasi Android.
 
 export function ModalDetail({
   terbuka,
@@ -40,6 +46,14 @@ export function ModalDetail({
   onHapus?: () => void;
   onPilihSesi?: (slot: Slot) => void;
 }) {
+  const insets = useSafeAreaInsets();
+  const [pilihan, setPilihan] = useState<Slot | null>(null);
+
+  // Pilihan lokal dibuang tiap kali modal dibuka untuk jadwal atau sesi lain.
+  useEffect(() => {
+    setPilihan(null);
+  }, [jadwal?.id, sesi?.mulai, terbuka]);
+
   if (!jadwal) return null;
 
   const gaya = gayaKategori(jadwal.kategori);
@@ -51,8 +65,15 @@ export function ModalDetail({
         : []
   );
 
-  const tampil = sesi ?? slots[0] ?? null;
+  const tampil = pilihan ?? sesi ?? slots[0] ?? null;
   const lewat = tampil ? sesiSelesai(tampil, now) : false;
+
+  const pilihSesi = (slot: Slot) => {
+    setPilihan(slot);
+    onPilihSesi?.(slot);
+  };
+
+  const adaAksiPemilik = milikSaya && Boolean(onIngatkan || onUbah || onHapus);
 
   return (
     <Modal
@@ -62,21 +83,41 @@ export function ModalDetail({
       statusBarTranslucent
       onRequestClose={onTutup}
     >
-      <View className="flex-1 justify-end bg-bw-ink/45">
-        <Pressable className="flex-1" onPress={onTutup} />
+      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <Pressable
+          accessible={false}
+          className="flex-1"
+          onPress={onTutup}
+        />
 
-        <View className="max-h-[88%] rounded-t-3xl border border-bw-line bg-bw-card">
-          <View className="flex-row items-start gap-3 border-b border-bw-line px-5 py-4">
+        <View className="max-h-[88%] rounded-t-[32px] border border-bw-line bg-bw-card">
+          {/* Pegangan */}
+          <View className="items-center pt-2.5">
+            <View className="h-1.5 w-10 rounded-full bg-bw-line" />
+          </View>
+
+          {/* Kepala */}
+          <View className="flex-row items-start gap-3 px-5 pb-4 pt-3">
+            <View
+              className={`h-12 w-12 items-center justify-center rounded-2xl border ${gaya.lencana}`}
+            >
+              <Ikon nama={gaya.ikon} token={gaya.aksen} ukuran={22} />
+            </View>
+
             <View className="min-w-0 flex-1">
               <View className="flex-row flex-wrap gap-1.5">
-                <Lencana className={gaya.lencana}>{jadwal.kategori}</Lencana>
+                <Lencana className={gaya.lencana} teks={gaya.teks}>
+                  {jadwal.kategori}
+                </Lencana>
                 {lewat ? (
                   <LencanaSelesai />
                 ) : jadwal.status !== 'Aktif' ? (
-                  <LencanaStatus>{jadwal.status}</LencanaStatus>
+                  <LencanaStatus bahaya={jadwal.status === 'Dibatalkan'}>
+                    {jadwal.status}
+                  </LencanaStatus>
                 ) : null}
               </View>
-              <Text className="mt-2 text-lg font-bold leading-snug text-bw-ink">
+              <Text className="mt-2 text-xl font-extrabold leading-snug text-bw-ink">
                 {jadwal.judul}
               </Text>
             </View>
@@ -85,19 +126,26 @@ export function ModalDetail({
               accessibilityRole="button"
               accessibilityLabel="Tutup detail jadwal"
               onPress={onTutup}
-              className="h-12 w-12 items-center justify-center rounded-full active:bg-bw-surface"
+              android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
+              className="h-11 w-11 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
             >
-              <Ikon nama="close" token="bw-muted" ukuran={22} />
+              <Ikon nama="close" token="bw-ink-2" ukuran={20} />
             </Pressable>
           </View>
 
-          <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 20 }}>
+          <View className="h-px bg-bw-line" />
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            className="px-5"
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: 20 }}
+          >
             {tampil ? (
-              <Blok label="Waktu">
-                <Text className="font-semibold text-bw-ink">
+              <Blok ikon="time-outline" label="Waktu">
+                <Text className="text-[15px] font-bold text-bw-ink">
                   {formatWaktuLengkap(tampil.mulai)}
                 </Text>
-                <Text className="mt-0.5 text-bw-muted">
+                <Text className="mt-0.5 text-sm text-bw-muted">
                   {tampil.selesai
                     ? `sampai ${formatJam(tampil.selesai)}`
                     : 'tanpa waktu selesai'}
@@ -106,26 +154,37 @@ export function ModalDetail({
             ) : null}
 
             {slots.length > 1 ? (
-              <Blok label={`Seluruh sesi (${slots.length})`}>
-                <View className="gap-1.5">
+              <Blok ikon="albums-outline" label={`Seluruh sesi (${slots.length})`}>
+                <View className="gap-2">
                   {slots.map((slot) => {
                     const dipilih = tampil?.mulai === slot.mulai;
+                    const selesai = sesiSelesai(slot, now);
                     return (
                       <Pressable
                         key={slot.mulai}
-                        onPress={() => onPilihSesi?.(slot)}
+                        onPress={() => pilihSesi(slot)}
                         accessibilityRole="button"
                         accessibilityState={{ selected: dipilih }}
-                        className={`flex-row items-baseline justify-between gap-3 rounded-xl border px-3 py-3 ${
+                        android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+                        className={`flex-row items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 active:opacity-70 ${
                           dipilih
-                            ? 'border-bw-blue-200 bg-bw-blue-50'
-                            : 'border-bw-line bg-bw-surface'
-                        }`}
+                            ? 'border-bw-blue bg-bw-blue-50'
+                            : 'border-transparent bg-bw-surface'
+                        } ${selesai && !dipilih ? 'opacity-60' : ''}`}
                       >
-                        <Text className="font-semibold text-bw-ink">
-                          {formatJam(slot.mulai)}
-                          {slot.selesai ? ` - ${formatJam(slot.selesai)}` : ''}
-                        </Text>
+                        <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                          {selesai ? (
+                            <Ikon nama="checkmark-circle" token="bw-muted" ukuran={16} />
+                          ) : null}
+                          <Text
+                            className={`text-sm font-bold ${
+                              dipilih ? 'text-bw-blue-700' : 'text-bw-ink'
+                            }`}
+                          >
+                            {formatJam(slot.mulai)}
+                            {slot.selesai ? ` - ${formatJam(slot.selesai)}` : ''}
+                          </Text>
+                        </View>
                         <Text className="text-xs text-bw-muted">
                           {formatTanggalPendek(slot.mulai)}
                         </Text>
@@ -136,22 +195,24 @@ export function ModalDetail({
               </Blok>
             ) : null}
 
-            <Blok label="Keterangan">
+            <Blok ikon="document-text-outline" label="Keterangan">
               {jadwal.deskripsi ? (
-                <Text className="text-bw-ink">{jadwal.deskripsi}</Text>
+                <Text className="text-sm leading-relaxed text-bw-ink">
+                  {jadwal.deskripsi}
+                </Text>
               ) : (
-                <Text className="text-bw-muted">Tidak ada keterangan.</Text>
+                <Text className="text-sm text-bw-muted">Tidak ada keterangan.</Text>
               )}
             </Blok>
 
-            <Blok label="Dibuat oleh">
-              <Text className="text-bw-ink">
-                {jadwal.pembuat_nama} - {namaDivisi(jadwal.pembuat_divisi)}
+            <Blok ikon="person-outline" label="Dibuat oleh">
+              <Text className="text-sm text-bw-ink">
+                {jadwal.pembuat_nama} · {namaDivisi(jadwal.pembuat_divisi)}
               </Text>
             </Blok>
 
-            <Blok label="Ditujukan untuk">
-              <Text className="text-bw-ink">
+            <Blok ikon="people-outline" label="Ditujukan untuk">
+              <Text className="text-sm text-bw-ink">
                 {jadwal.target_divisi
                   ? `Divisi ${namaDivisi(jadwal.target_divisi)}`
                   : 'Semua staf'}
@@ -159,26 +220,46 @@ export function ModalDetail({
             </Blok>
           </ScrollView>
 
-          <View className="flex-row flex-wrap gap-2 border-t border-bw-line bg-bw-surface/70 px-5 py-3">
-            {milikSaya && onIngatkan ? (
-              <TombolDialog
-                label="Ingatkan"
-                onPress={onIngatkan}
-                className="flex-1 bg-bw-blue"
-                tokenTeks="bw-ink"
-              />
-            ) : null}
-            {milikSaya && onUbah ? (
-              <TombolDialog label="Ubah" onPress={onUbah} className="flex-1 bg-bw-card" />
-            ) : null}
-            {milikSaya && onHapus ? (
-              <TombolDialog
-                label="Hapus"
-                onPress={onHapus}
-                className="flex-1 bg-bw-red-50"
-              />
-            ) : null}
-            <TombolDialog label="Tutup" onPress={onTutup} className="flex-1 bg-bw-card" />
+          {/* Aksi */}
+          <View
+            className="gap-2 border-t border-bw-line bg-bw-surface px-5 pt-3"
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+          >
+            {adaAksiPemilik ? (
+              <>
+                {onIngatkan ? (
+                  <TombolAksi
+                    ikon="notifications-outline"
+                    label="Ingatkan staf"
+                    onPress={onIngatkan}
+                    tone="utama"
+                  />
+                ) : null}
+                {onUbah || onHapus ? (
+                  <View className="flex-row gap-2">
+                    {onUbah ? (
+                      <TombolAksi
+                        ikon="create-outline"
+                        label="Ubah"
+                        onPress={onUbah}
+                        lebar="flex-1"
+                      />
+                    ) : null}
+                    {onHapus ? (
+                      <TombolAksi
+                        ikon="trash-outline"
+                        label="Hapus"
+                        onPress={onHapus}
+                        tone="bahaya"
+                        lebar="flex-1"
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <TombolAksi label="Tutup" onPress={onTutup} />
+            )}
           </View>
         </View>
       </View>
@@ -187,18 +268,67 @@ export function ModalDetail({
 }
 
 function Blok({
+  ikon,
   label,
   children,
 }: {
+  ikon: NamaIkon;
   label: string;
   children: React.ReactNode;
 }) {
   return (
-    <View className="mt-4">
-      <Text className="text-xs font-bold uppercase tracking-wide text-bw-muted">
-        {label}
-      </Text>
-      <View className="mt-1 text-sm leading-relaxed">{children}</View>
+    <View className="mt-5">
+      <View className="flex-row items-center gap-1.5">
+        <Ikon nama={ikon} token="bw-muted" ukuran={14} />
+        <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
+          {label}
+        </Text>
+      </View>
+      <View className="mt-2">{children}</View>
     </View>
+  );
+}
+
+// Peta statis, bukan kelas yang dirangkai: NativeWind membaca kelas saat build.
+const GAYA_AKSI = {
+  utama: { wadah: 'bg-bw-blue', teks: 'text-white', token: 'bw-blue-50' },
+  netral: {
+    wadah: 'border border-bw-line bg-bw-card',
+    teks: 'text-bw-ink',
+    token: 'bw-ink-2',
+  },
+  bahaya: {
+    wadah: 'border border-bw-red-100 bg-bw-red-50',
+    teks: 'text-bw-red',
+    token: 'bw-red',
+  },
+} as const satisfies Record<string, { wadah: string; teks: string; token: TokenWarna }>;
+
+function TombolAksi({
+  ikon,
+  label,
+  onPress,
+  tone = 'netral',
+  lebar = '',
+}: {
+  ikon?: NamaIkon;
+  label: string;
+  onPress: () => void;
+  tone?: keyof typeof GAYA_AKSI;
+  lebar?: string;
+}) {
+  const gaya = GAYA_AKSI[tone];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      android_ripple={{ color: 'rgba(128,128,128,0.2)' }}
+      className={`h-14 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80 ${gaya.wadah} ${lebar}`}
+    >
+      {ikon ? <Ikon nama={ikon} token={gaya.token} ukuran={18} /> : null}
+      <Text className={`text-base font-bold ${gaya.teks}`}>{label}</Text>
+    </Pressable>
   );
 }

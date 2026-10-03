@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -31,7 +32,7 @@ import {
 // juga di sana.
 //
 // Perbedaan dari web yang perlu diketahui: tanggal dan jam dipilih terpisah
-// lewat dialogue sistem, karena React Native tidak punya padanan
+// lewat dialog sistem, karena React Native tidak punya padanan
 // <input type="datetime-local">. Detail pilihannya ada di BarisSlot.
 
 export interface ProfilPembuat {
@@ -70,11 +71,14 @@ export default function FormJadwal({
   const galatTarget = galat.find((item) => item.jenis === 'target');
 
   const bersihkanGalat = useCallback((kunci: keyof FormJadwal) => {
+    // Nama kolom form tidak selalu sama dengan jenis galatnya:
+    // targetDivisi -> 'target', slots -> 'slot'. Tanpa pemetaan ini galat
+    // penerima pengingat tidak pernah hilang setelah pilihan diganti.
+    const jenisGalat =
+      kunci === 'targetDivisi' ? 'target' : kunci === 'slots' ? 'slot' : kunci;
+
     setGalat((sebelumnya) =>
-      sebelumnya.filter(
-        (item) =>
-          !(item.jenis === kunci || (kunci === 'slots' && item.jenis === 'slot'))
-      )
+      sebelumnya.filter((item) => item.jenis !== jenisGalat)
     );
     setGalatUmum('');
   }, []);
@@ -210,6 +214,12 @@ export default function FormJadwal({
     [menyimpan, form.judul]
   );
 
+  const labelSimpan = menyimpan
+    ? 'Menyimpan...'
+    : mode === 'buat'
+      ? 'Simpan jadwal'
+      : 'Simpan perubahan';
+
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top', 'bottom']}>
       <BilahAtas
@@ -222,17 +232,17 @@ export default function FormJadwal({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
         >
           <Bidang label="Judul" galat={galatJudul?.pesan} wajib>
-            <TextInput
+            <KolomTeks
               value={form.judul}
               onChangeText={(nilai) => ubah('judul', nilai)}
               placeholder="Rapat Koordinasi Anggaran"
-              placeholderTextColor="#9a9aa0"
               accessibilityLabel="Judul jadwal"
-              className="h-14 rounded-2xl border border-bw-line bg-bw-card px-4 text-base text-bw-ink"
+              adaGalat={Boolean(galatJudul)}
             />
           </Bidang>
 
@@ -244,7 +254,10 @@ export default function FormJadwal({
             />
           </Bagian>
 
-          <Bagian label="Penerima pengingat">
+          <Bagian
+            label="Penerima pengingat"
+            petunjuk="Pilih divisi tertentu, atau biarkan Semua staf."
+          >
             <PilihanChip
               opsi={[
                 { nilai: '', label: 'Semua staf' },
@@ -260,14 +273,12 @@ export default function FormJadwal({
           </Bagian>
 
           <Bagian label="Keterangan">
-            <TextInput
+            <KolomTeks
               value={form.deskripsi}
               onChangeText={(nilai) => ubah('deskripsi', nilai)}
               placeholder="Opsional: agenda, lokasi, apa yang perlu disiapkan"
-              placeholderTextColor="#9a9aa0"
-              multiline
               accessibilityLabel="Keterangan jadwal"
-              className="min-h-24 rounded-2xl border border-bw-line bg-bw-card px-4 py-3 text-base leading-relaxed text-bw-ink"
+              multiline
             />
           </Bagian>
 
@@ -292,36 +303,47 @@ export default function FormJadwal({
           {galatUmum ? (
             <View
               accessibilityRole="alert"
-              className="mt-4 rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3"
+              className="flex-row items-start gap-2.5 rounded-3xl border border-bw-red-100 bg-bw-red-50 p-4"
             >
-              <Text className="text-sm leading-relaxed text-bw-red">
+              <Ikon nama="alert-circle-outline" token="bw-red" ukuran={18} />
+              <Text className="flex-1 text-sm leading-relaxed text-bw-red">
                 {galatUmum}
               </Text>
             </View>
           ) : null}
+        </ScrollView>
 
+        {/* Tombol simpan menempel di bawah supaya selalu terjangkau jempol. */}
+        <View className="border-t border-bw-line bg-bw-card px-5 pb-3 pt-3">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Simpan jadwal"
+            accessibilityLabel={labelSimpan}
+            accessibilityState={{ disabled: !bisaSimpan, busy: menyimpan }}
             onPress={simpan}
             disabled={!bisaSimpan}
-            className={`mt-6 h-14 items-center justify-center rounded-2xl active:opacity-80 ${
-              bisaSimpan ? 'bg-bw-blue' : 'bg-bw-line'
+            android_ripple={bisaSimpan ? { color: 'rgba(255,255,255,0.2)' } : undefined}
+            className={`h-14 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80 ${
+              bisaSimpan || menyimpan ? 'bg-bw-blue' : 'bg-bw-line'
             }`}
           >
+            {menyimpan ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ikon
+                nama="checkmark"
+                token={bisaSimpan ? 'bw-blue-50' : 'bw-muted'}
+                ukuran={20}
+              />
+            )}
             <Text
               className={`text-base font-bold ${
-                bisaSimpan ? 'text-white' : 'text-bw-muted'
+                bisaSimpan || menyimpan ? 'text-white' : 'text-bw-muted'
               }`}
             >
-              {menyimpan
-                ? 'Menyimpan...'
-                : mode === 'buat'
-                  ? 'Simpan jadwal'
-                  : 'Simpan perubahan'}
+              {labelSimpan}
             </Text>
           </Pressable>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -329,20 +351,62 @@ export default function FormJadwal({
 
 function BilahAtas({ judul, onTutup }: { judul: string; onTutup: () => void }) {
   return (
-    <View className="flex-row items-center gap-2 border-b border-bw-line bg-bw-card px-2 py-2">
+    <View className="flex-row items-center gap-2 border-b border-bw-line bg-bw-card px-3 py-2">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Batal"
         onPress={onTutup}
-        className="h-12 w-12 items-center justify-center rounded-full active:bg-bw-surface"
+        android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
+        className="h-12 w-12 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
       >
         <Ikon nama="close" token="bw-ink-2" ukuran={22} />
       </Pressable>
-      <Text className="flex-1 text-center text-base font-bold text-bw-ink">
+      <Text className="flex-1 text-center text-lg font-extrabold text-bw-ink">
         {judul}
       </Text>
       <View className="h-12 w-12" />
     </View>
+  );
+}
+
+function KolomTeks({
+  value,
+  onChangeText,
+  placeholder,
+  accessibilityLabel,
+  multiline = false,
+  adaGalat = false,
+}: {
+  value: string;
+  onChangeText: (nilai: string) => void;
+  placeholder: string;
+  accessibilityLabel: string;
+  multiline?: boolean;
+  adaGalat?: boolean;
+}) {
+  const [fokus, setFokus] = useState(false);
+
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      onFocus={() => setFokus(true)}
+      onBlur={() => setFokus(false)}
+      placeholder={placeholder}
+      placeholderTextColor="#9a9aa0"
+      accessibilityLabel={accessibilityLabel}
+      multiline={multiline}
+      textAlignVertical={multiline ? 'top' : 'center'}
+      className={`rounded-2xl border-2 bg-bw-card px-4 text-base text-bw-ink ${
+        multiline ? 'min-h-28 py-3 leading-relaxed' : 'h-14'
+      } ${
+        adaGalat
+          ? 'border-bw-red'
+          : fokus
+            ? 'border-bw-blue'
+            : 'border-bw-line'
+      }`}
+    />
   );
 }
 
@@ -358,28 +422,49 @@ function Bidang({
   wajib?: boolean;
 }) {
   return (
-    <View className="mb-4">
-      <Text className="mb-1.5 text-xs font-bold uppercase tracking-wide text-bw-muted">
+    <View className="mb-6">
+      <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
         {label}
         {wajib ? ' *' : ''}
       </Text>
       {children}
-      {galat ? (
-        <Text accessibilityRole="alert" className="mt-1.5 text-xs text-bw-red">
-          {galat}
-        </Text>
-      ) : null}
+      {galat ? <TeksGalat pesan={galat} /> : null}
     </View>
   );
 }
 
-function Bagian({ label, children }: { label: string; children: React.ReactNode }) {
+function Bagian({
+  label,
+  petunjuk,
+  children,
+}: {
+  label: string;
+  petunjuk?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <View className="mb-4">
-      <Text className="mb-1.5 text-xs font-bold uppercase tracking-wide text-bw-muted">
+    <View className="mb-6">
+      <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
         {label}
       </Text>
+      {petunjuk ? (
+        <Text className="-mt-1 mb-2.5 ml-1 text-xs leading-relaxed text-bw-muted">
+          {petunjuk}
+        </Text>
+      ) : null}
       {children}
+    </View>
+  );
+}
+
+function TeksGalat({ pesan }: { pesan: string }) {
+  return (
+    <View
+      accessibilityRole="alert"
+      className="mt-2 ml-1 flex-row items-center gap-1.5"
+    >
+      <Ikon nama="alert-circle-outline" token="bw-red" ukuran={14} />
+      <Text className="flex-1 text-xs text-bw-red">{pesan}</Text>
     </View>
   );
 }
@@ -396,8 +481,8 @@ function PilihanChip({
   galat?: string;
 }) {
   return (
-    <View className="gap-2">
-      <View className="flex-row flex-wrap gap-2">
+    <View>
+      <View accessibilityRole="radiogroup" className="flex-row flex-wrap gap-2">
         {opsi.map((item) => {
           const aktif = item.nilai === nilai;
           return (
@@ -406,10 +491,11 @@ function PilihanChip({
               accessibilityRole="radio"
               accessibilityState={{ selected: aktif }}
               onPress={() => onPilih(item.nilai)}
-              className={`min-h-11 justify-center rounded-full border px-4 py-2 active:opacity-70 ${
+              className={`min-h-11 flex-row items-center justify-center gap-1.5 rounded-full border px-4 py-2 active:opacity-70 ${
                 aktif ? 'border-bw-blue bg-bw-blue' : 'border-bw-line bg-bw-card'
               }`}
             >
+              {aktif ? <Ikon nama="checkmark" token="bw-blue-50" ukuran={14} /> : null}
               <Text
                 className={`text-xs font-bold ${aktif ? 'text-white' : 'text-bw-ink-2'}`}
               >
@@ -419,11 +505,7 @@ function PilihanChip({
           );
         })}
       </View>
-      {galat ? (
-        <Text accessibilityRole="alert" className="text-xs text-bw-red">
-          {galat}
-        </Text>
-      ) : null}
+      {galat ? <TeksGalat pesan={galat} /> : null}
     </View>
   );
 }

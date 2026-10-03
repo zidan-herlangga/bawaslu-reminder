@@ -6,12 +6,16 @@ import { supabase } from './supabase';
 // Pengambilan daftar jadwal.
 //
 // Port dari src/hooks/useSchedules.js. Jalur sinkronisasinya dipertahankan
-// sama: realtime menjadi jalur utama, dengan poll berkala dan refresh saat tab
-// kembali aktif sebagai jaring pengaman kalau tabel schedules belum masuk
-// publication supabase_realtime.
+// sama: realtime menjadi jalur utama, dengan poll berkala dan refresh saat
+// aplikasi kembali aktif sebagai jaring pengaman kalau tabel schedules belum
+// masuk publication supabase_realtime.
 
 const POLL_AKTIF_MS = 30 * 1000;
 const POLL_SAMBUNG_MS = 90 * 1000;
+
+// Beberapa perubahan beruntun (mis. hapus lalu insert) cukup memicu satu
+// pemuatan ulang.
+const TUNDA_REALTIME_MS = 250;
 
 // Channel realtime WAJIB punya nama yang berbeda per pemanggil.
 //
@@ -31,9 +35,9 @@ const POLL_SAMBUNG_MS = 90 * 1000;
 // Bedanya satu koneksi websocket tambahan yang memang sudah dipakai bersama.
 let penghitungKanal = 0;
 
-export function namaKanalUnik(pAwalan: string): string {
+export function namaKanalUnik(awalan: string): string {
   penghitungKanal += 1;
-  return `${pAwalan}-${penghitungKanal}`;
+  return `${awalan}-${penghitungKanal}`;
 }
 
 export interface HasilJadwal {
@@ -44,6 +48,26 @@ export interface HasilJadwal {
   muatUlang: (opts?: { senyap?: boolean }) => Promise<void>;
 }
 
+/**
+ * Menyusun pesan galat yang sesuai penyebabnya. Petunjuk "jalankan schema.sql"
+ * hanya masuk akal untuk masalah skema atau izin; kalau penyebabnya jaringan,
+ * petunjuk itu menyesatkan.
+ */
+function susunPesanGalat(pesan: string): string {
+  const masalahJaringan = /network|fetch|timeout|timed out|failed to/i.test(pesan);
+  if (masalahJaringan) {
+    return 'Tidak bisa terhubung ke server. Periksa koneksi internet, lalu coba lagi.';
+  }
+
+  const masalahSkema =
+    /schema cache|could not find|does not exist|relation|permission denied/i.test(pesan);
+
+  return (
+    `Gagal memuat jadwal. Detail: ${pesan}.` +
+    (masalahSkema ? ' Jalankan supabase/schema.sql di SQL Editor Supabase.' : '')
+  );
+}
+
 export function useJadwal(sessionId: string | null): HasilJadwal {
   const [jadwal, setJadwal] = useState<Jadwal[]>([]);
   const [memuat, setMemuat] = useState(true);
@@ -51,6 +75,15 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
   const [terhubung, setTerhubung] = useState(false);
 
   const hidup = useRef(true);
+
+  // Nomor permintaan terakhir. Beberapa pemuatan bisa berjalan bersamaan (poll,
+  // realtime, tombol segarkan). Hanya hasil dari yang paling baru yang dipakai,
+  // supaya jawaban lama yang tiba belakangan tidak menimpa data yang lebih baru.
+  const permintaan = useRef(0);
+
+  // Jumlah jadwal yang sedang tampil, dibaca di dalam muatUlang tanpa membuat
+  // fungsi itu ikut berubah.
+  const jumlah = useRef(0);
 
   // useRef, bukan useState: nama channel harus tetap sama saat StrictMode
   // menjalankan ulang efek, supaya channel yang dibersihkan dan yang dibuat
@@ -67,40 +100,61 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
     };
   }, []);
 
-  const muatUlang = useCallback(async ({ senyap = false } = {}) => {
-    if (!senyap) setMemuat(true);
+  const muatUlang = useCallback(
+    async ({ senyap = false }: { senyap?: boolean } = {}) => {
+      const nomor = ++permintaan.current;
+      if (!senyap) setMemuat(true);
 
-    const { data, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .order('waktu_mulai', { ascending: true });
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('*')
+        .order('waktu_mulai', { ascending: true });
 
-    if (!hidup.current) return;
+      // Layar sudah ditutup, atau sudah ada permintaan yang lebih baru.
+      if (!hidup.current || nomor !== permintaan.current) return;
 
-    if (error) {
-      console.warn('[jadwal] gagal memuat:', error.message);
-      setGalat(
-        `Gagal memuat jadwal. Detail: ${error.message}. ` +
-          'Jalankan supabase/schema.sql di SQL Editor Supabase.'
-      );
+      if (error) {
+        console.warn('[jadwal] gagal memuat:', error.message);
+
+        // Data yang sudah ada tetap dipertahankan. Di lapangan sinyal sering
+        // putus sebentar, dan daftar yang mendadak kosong tiap poll gagal
+        // lebih merugikan daripada data yang terlambat beberapa menit.
+        // Pemuatan senyap yang gagal tidak perlu mengganggu dengan pesan,
+        // kecuali memang belum ada data sama sekali.
+        if (!senyap || jumlah.current === 0) {
+          setGalat(susunPesanGalat(error.message));
+        }
+      } else {
+        const baris = (data ?? []) as Jadwal[];
+        jumlah.current = baris.length;
+        setGalat('');
+        setJadwal(baris);
+      }
+
+      setMemuat(false);
+    },
+    []
+  );
+
+  // Pemuatan awal, dan bersihkan data kalau pengguna keluar. Tanpa
+  // pembersihan, akun lain yang masuk di perangkat yang sama sempat melihat
+  // jadwal akun sebelumnya sampai pemuatan selesai.
+  useEffect(() => {
+    if (!sessionId) {
+      jumlah.current = 0;
       setJadwal([]);
-    } else {
-      setGalat('');
-      setJadwal((data ?? []) as Jadwal[]);
+      return undefined;
     }
 
-    setMemuat(false);
-  }, []);
-
-  useEffect(() => {
-    if (!sessionId) return undefined;
-    setMemuat(true);
-    muatUlang();
+    void muatUlang();
+    return undefined;
   }, [sessionId, muatUlang]);
 
   // Realtime: satu channel per pemanggil, bukan per pengguna.
   useEffect(() => {
     if (!sessionId) return undefined;
+
+    let tunda: ReturnType<typeof setTimeout> | undefined;
 
     const channel = supabase
       .channel(`${namaKanal.current}-${sessionId}`)
@@ -108,7 +162,10 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         () => {
-          muatUlang({ senyap: true });
+          if (tunda) clearTimeout(tunda);
+          tunda = setTimeout(() => {
+            void muatUlang({ senyap: true });
+          }, TUNDA_REALTIME_MS);
         }
       )
       .subscribe((status) => {
@@ -117,6 +174,7 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
       });
 
     return () => {
+      if (tunda) clearTimeout(tunda);
       setTerhubung(false);
       supabase.removeChannel(channel);
     };
@@ -131,7 +189,7 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
 
     const tick = () => {
       if (AppState.currentState === 'active') {
-        muatUlang({ senyap: true });
+        void muatUlang({ senyap: true });
       }
       timer = setTimeout(
         tick,
@@ -152,7 +210,7 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
     if (!sessionId) return undefined;
 
     const onPerubahan = (status: AppStateStatus) => {
-      if (status === 'active') muatUlang({ senyap: true });
+      if (status === 'active') void muatUlang({ senyap: true });
     };
 
     const langganan = AppState.addEventListener('change', onPerubahan);

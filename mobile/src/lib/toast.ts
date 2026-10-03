@@ -1,9 +1,9 @@
 // Toast sederhana untuk aplikasi native.
 //
 // Web memakai pub/sub supaya komponen mana pun bisa memunculkan toast dari
-// provider di layout. Di native tidak ada portal, jadi cukup satu modul: layar
-// yang Rentan dari mana pun cukup memanggil showToast, dan layarnya yang
-// memerhatikannya.
+// provider di layout. Di native tidak ada portal, jadi cukup satu modul: kode
+// di mana pun cukup memanggil showToast, dan ToastHost (dipasang sekali di
+// layout akar) yang berlangganan dan menampilkannya.
 
 export type NadaToast = 'sukses' | 'galat' | 'info';
 
@@ -26,5 +26,15 @@ export function subscribeToast(listener: Pendengar): () => void {
 export function showToast(pesan: string, nada: NadaToast = 'info'): void {
   if (!pesan) return;
   const item: PesanToast = { pesan: String(pesan), nada };
-  for (const listener of pendengar) listener(item);
+
+  // Disalin dulu supaya berhenti berlangganan di tengah pengiriman tidak
+  // mengacaukan iterasi, dan satu pendengar yang melempar galat tidak membuat
+  // pendengar lain tidak kebagian pesan.
+  for (const listener of Array.from(pendengar)) {
+    try {
+      listener(item);
+    } catch (kesalahan) {
+      console.warn('[toast] pendengar gagal:', kesalahan);
+    }
+  }
 }

@@ -1,37 +1,77 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Ikon } from './Ikon';
+import {
+  Appearance,
+  BackHandler,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Penangkap galat untuk seluruh aplikasi.
 //
 // Tanpa ini, satu galat di satu hook membuat layar kosong tanpa penjelasan.
 // Itu yang terjadi ketika dua tab berebut channel realtime dengan nama sama:
-// React Throw, seluruh pohon ikut mati, dan staf hanya melihat layar kosong.
+// React melempar galat, seluruh pohon ikut mati, dan staf hanya melihat layar
+// kosong.
 //
 // Prinsipnya sama seperti di web: tampilkan galatnya apa adanya, lalu beri dua
 // jalan keluar. "Coba lagi" membangun ulang pohon tanpa menutup aplikasi.
-// "Keluar" dipakai kalau galatnya berulang, supaya pengguna tidak terjebak
-//Infinite loop yang menutup-nutup sendiri.
+// "Tutup aplikasi" dipakai kalau galatnya berulang, supaya pengguna tidak
+// terjebak dalam siklus coba-gagal-coba.
+//
+// Layar galat sengaja TIDAK memakai token tema (bw-*) dan komponen Ikon.
+// Pembungkus vars() dari NativeWind dipasang di dalam pohon yang dijaga
+// komponen ini, jadi saat galat terjadi token itu tidak punya nilai. Selain
+// itu, kalau galatnya berasal dari tema itu sendiri, layar galat ikut rusak.
+// Warna diambil langsung dari pengaturan terang/gelap sistem.
 //
 // Catatan: galat yang terjadi saat sebuah modul diimpor tidak tertangkap di
 // sini. Itu batas dari error boundary React, bukan kelemahan kode ini.
 
 interface Keadaan {
   galat: Error | null;
+  detailTerbuka: boolean;
 }
+
+const WARNA = {
+  terang: {
+    latar: '#f5f5f7',
+    kartu: '#ffffff',
+    garis: '#e5e5ea',
+    teks: '#1d1d1f',
+    redup: '#6b6b70',
+    teksKedua: '#3a3a3c',
+    biru: '#0071e3',
+    merah: '#d92d20',
+    merahMuda: '#fee4e2',
+  },
+  gelap: {
+    latar: '#000000',
+    kartu: '#1c1c1e',
+    garis: '#38383a',
+    teks: '#f5f5f7',
+    redup: '#98989d',
+    teksKedua: '#d1d1d6',
+    biru: '#2997ff',
+    merah: '#ff6961',
+    merahMuda: '#3b1a18',
+  },
+} as const;
 
 export default class BatasGalat extends Component<
   { children: ReactNode },
   Keadaan
 > {
-  // Tipe state disimpulkan dari parameter kedua Component, jadi tidak perlu
-  // anotasi di sini.
   constructor(props: { children: ReactNode }) {
     super(props);
-    this.state = { galat: null };
+    this.state = { galat: null, detailTerbuka: false };
   }
 
-  static getDerivedStateFromError(galat: Error): Keadaan {
+  static getDerivedStateFromError(galat: Error): Partial<Keadaan> {
     return { galat };
   }
 
@@ -40,67 +80,208 @@ export default class BatasGalat extends Component<
   }
 
   cobaLagi = () => {
-    this.setState({ galat: null });
+    this.setState({ galat: null, detailTerbuka: false });
+  };
+
+  alihDetail = () => {
+    this.setState((s) => ({ detailTerbuka: !s.detailTerbuka }));
+  };
+
+  /**
+   * Menutup aplikasi. Hanya Android yang mengizinkannya lewat BackHandler.
+   * iOS tidak menyediakan cara resmi untuk menutup diri sendiri, jadi di sana
+   * tombol ini tidak ditampilkan dan diganti petunjuk.
+   */
+  keluar = () => {
+    if (Platform.OS === 'android') BackHandler.exitApp();
   };
 
   render() {
-    const { galat } = this.state;
+    const { galat, detailTerbuka } = this.state;
     if (!galat) return this.props.children;
 
+    const w = WARNA[Appearance.getColorScheme() === 'dark' ? 'gelap' : 'terang'];
+    const diAndroid = Platform.OS === 'android';
+
     return (
-      <View className="flex-1 bg-bw-canvas">
-        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 64 }}>
-          <View className="h-14 w-14 items-center justify-center rounded-full bg-bw-red-50">
-            <Ikon nama="alert-circle" token="bw-red" ukuran={28} />
-          </View>
-
-          <Text className="mt-4 text-xl font-bold text-bw-ink">
-            Aplikasi gagal ditampilkan
-          </Text>
-          <Text className="mt-2 text-sm leading-relaxed text-bw-muted">
-            Ada kesalahan yang tidak terduga. Data jadwal dan tugas kamu tetap
-            aman di server.
-          </Text>
-
-          <View className="mt-4 rounded-2xl border border-bw-line bg-bw-card p-3.5">
-            <Text
-              selectable
-              className="text-xs leading-relaxed text-bw-ink-2"
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        style={{ flex: 1, backgroundColor: w.latar }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingHorizontal: 28,
+            paddingVertical: 32,
+          }}
+        >
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: 44,
+                backgroundColor: w.merahMuda,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              {galat.message || 'Kesalahan tidak diketahui.'}
+              <Ionicons name="alert-circle" size={44} color={w.merah} />
+            </View>
+
+            <Text
+              style={{
+                marginTop: 20,
+                fontSize: 22,
+                fontWeight: '800',
+                color: w.teks,
+                textAlign: 'center',
+              }}
+            >
+              Aplikasi gagal ditampilkan
+            </Text>
+            <Text
+              style={{
+                marginTop: 8,
+                fontSize: 14,
+                lineHeight: 21,
+                color: w.redup,
+                textAlign: 'center',
+              }}
+            >
+              Ada kesalahan yang tidak terduga. Data jadwal dan tugas kamu tetap
+              aman di server.
             </Text>
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={this.cobaLagi}
-            className="mt-6 h-14 items-center justify-center rounded-2xl bg-bw-blue active:opacity-80"
+          {/* Detail teknis */}
+          <View
+            style={{
+              marginTop: 24,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: w.garis,
+              backgroundColor: w.kartu,
+              overflow: 'hidden',
+            }}
           >
-            <Text className="text-base font-bold text-white">Coba lagi</Text>
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: detailTerbuka }}
+              accessibilityLabel={
+                detailTerbuka ? 'Sembunyikan detail teknis' : 'Tampilkan detail teknis'
+              }
+              onPress={this.alihDetail}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                  color: w.redup,
+                }}
+              >
+                Detail teknis
+              </Text>
+              <Ionicons
+                name={detailTerbuka ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={w.redup}
+              />
+            </Pressable>
 
+            {detailTerbuka ? (
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: w.garis,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                }}
+              >
+                <Text
+                  selectable
+                  style={{ fontSize: 12, lineHeight: 18, color: w.teksKedua }}
+                >
+                  {galat.message || 'Kesalahan tidak diketahui.'}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Tombol */}
           <Pressable
             accessibilityRole="button"
-            onPress={this.keluar}
-            className="mt-3 h-14 items-center justify-center rounded-2xl border border-bw-line bg-bw-card active:opacity-80"
+            accessibilityLabel="Coba lagi"
+            onPress={this.cobaLagi}
+            android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+            style={({ pressed }) => ({
+              marginTop: 24,
+              height: 56,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              borderRadius: 16,
+              backgroundColor: w.biru,
+              opacity: pressed ? 0.8 : 1,
+            })}
           >
-            <Text className="text-base font-bold text-bw-ink-2">
-              Tutup aplikasi
+            <Ionicons name="refresh" size={20} color="#ffffff" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#ffffff' }}>
+              Coba lagi
             </Text>
           </Pressable>
+
+          {diAndroid ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tutup aplikasi"
+              onPress={this.keluar}
+              android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+              style={({ pressed }) => ({
+                marginTop: 12,
+                height: 56,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: w.garis,
+                backgroundColor: w.kartu,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: w.teksKedua }}>
+                Tutup aplikasi
+              </Text>
+            </Pressable>
+          ) : (
+            <Text
+              style={{
+                marginTop: 16,
+                fontSize: 12,
+                lineHeight: 18,
+                color: w.redup,
+                textAlign: 'center',
+              }}
+            >
+              Kalau galat berulang, tutup aplikasi dengan menggeser ke atas dari
+              tepi bawah layar, lalu buka lagi.
+            </Text>
+          )}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
-
-  /**
-   * Menutup aplikasi. React Native tidak menyediakan cara sanctioned untuk
-   * menutup diri sendiri, jadi tombol ini hanya memberi tahu: tekan tombol
-   * kembali di Android atau geser ke atas di iOS. Sengaja tidak dipaksa,
-   * karena memaksa keluar dari aplikasi sendiri bisa membuat pengguna kehilangan
-   * pekerjaan yang belum tersimpan.
-   */
-  keluar = () => {
-    console.warn('[batas-galat] pengguna diminta menutup aplikasi');
-  };
 }

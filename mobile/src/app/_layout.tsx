@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BatasGalat from '../komponen/BatasGalat';
+import { ToastHost } from '../komponen/ToastHost';
 import { SesiProvider } from '../lib/session';
 import { TemaProvider, useTema } from '../tema/TemaProvider';
 
@@ -29,6 +30,13 @@ import { TemaProvider, useTema } from '../tema/TemaProvider';
 // BatasGalat membungkus Stack, bukan provider di atasnya. Provider jarang yang
 // melempar galat, sedangkan tiap layar bisa. Satu layar yang gagal tidak boleh
 // membuat seluruh aplikasi kosong tanpa penjelasan.
+//
+// ToastHost dipasang setelah Stack supaya tergambar di atas semua layar. Ia
+// harus berada di dalam View ber-vars() agar token warnanya terbaca.
+//
+// contentStyle dibuat transparan supaya latar bg-bw-canvas dari View di atas
+// yang tampil. Dengan begitu tidak ada kedipan putih saat pindah layar di mode
+// gelap, dan warnanya tetap mengikuti token tema.
 
 export default function LayoutAkar() {
   return (
@@ -51,8 +59,26 @@ function Akar() {
 
   return (
     <View style={[vars(variabel), { flex: 1 }]} className="flex-1 bg-bw-canvas">
-      <StatusBar style={dipakai === 'gelap' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar style={dipakai === 'gelap' ? 'light' : 'dark'} animated />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade_from_bottom',
+          animationDuration: 220,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      >
+        {/* Formulir jadwal naik dari bawah seperti lembar, bukan pindah halaman. */}
+        <Stack.Screen
+          name="jadwal/baru"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="jadwal/[id]"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+      </Stack>
+      <ToastHost />
     </View>
   );
 }
