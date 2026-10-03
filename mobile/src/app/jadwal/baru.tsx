@@ -1,9 +1,9 @@
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FormJadwal, { type ProfilPembuat } from '../../komponen/FormJadwal';
 import { Ikon } from '../../komponen/Ikon';
+import { kembali } from '../../lib/kembali';
 import { useSesi } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { formKosong, type FormJadwal as BentukForm } from '../../shared/validasiJadwal';
@@ -15,7 +15,6 @@ import { formKosong, type FormJadwal as BentukForm } from '../../shared/validasi
 // ke komponen tersebut.
 
 export default function LayarBuatJadwal() {
-  const router = useRouter();
   const { session, loading } = useSesi();
   const userId = session?.user.id ?? '';
 
@@ -58,7 +57,7 @@ export default function LayarBuatJadwal() {
       <LayarGalat
         judul="Sesi tidak ditemukan"
         pesan="Silakan masuk kembali untuk membuat jadwal."
-        onTutup={() => router.back()}
+        onTutup={() => kembali()}
       />
     );
   }
@@ -67,7 +66,7 @@ export default function LayarBuatJadwal() {
     return (
       <LayarTunggu
         pesan="Menyiapkan formulir..."
-        onTutup={() => router.back()}
+        onTutup={() => kembali()}
       />
     );
   }
@@ -79,8 +78,8 @@ export default function LayarBuatJadwal() {
       userId={userId}
       email={session?.user.email ?? null}
       profil={profil}
-      onTutup={() => router.back()}
-      onSelesai={() => router.back()}
+      onTutup={() => kembali()}
+      onSelesai={() => kembali()}
     />
   );
 }

@@ -1,7 +1,8 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import FormJadwal, { type ProfilPembuat } from '../../komponen/FormJadwal';
 import { LayarGalat, LayarTunggu } from '../../komponen/LayarTunggu';
+import { kembali } from '../../lib/kembali';
 import { useSesi } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { formDariJadwal, type FormJadwal as BentukForm } from '../../shared/validasiJadwal';
@@ -20,7 +21,6 @@ import { formDariJadwal, type FormJadwal as BentukForm } from '../../shared/vali
 // tampilan tidak mungkin berbeda antara keduanya.
 
 export default function LayarUbahJadwal() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session, loading } = useSesi();
   const userId = session?.user.id ?? '';
@@ -112,14 +112,14 @@ export default function LayarUbahJadwal() {
       <LayarGalat
         judul="Tidak bisa diubah"
         pesan={alasan}
-        onTutup={() => router.back()}
+        onTutup={() => kembali()}
       />
     );
   }
 
   if (loading || !siap || !nilaiAwal) {
     return (
-      <LayarTunggu pesan="Memuat jadwal..." onTutup={() => router.back()} />
+      <LayarTunggu pesan="Memuat jadwal..." onTutup={() => kembali()} />
     );
   }
 
@@ -131,8 +131,8 @@ export default function LayarUbahJadwal() {
       userId={userId}
       email={session?.user.email ?? null}
       profil={profil}
-      onTutup={() => router.back()}
-      onSelesai={() => router.back()}
+      onTutup={() => kembali()}
+      onSelesai={() => kembali()}
     />
   );
 }
