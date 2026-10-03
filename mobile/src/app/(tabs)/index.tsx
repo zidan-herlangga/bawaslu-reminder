@@ -1,0 +1,324 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
+import { Ikon } from '../../komponen/Ikon';
+import { KartuJadwal } from '../../komponen/KartuJadwal';
+import { ModalDetail } from '../../komponen/ModalDetail';
+import { apiUrl } from '../../lib/api';
+import { useSesi } from '../../lib/session';
+import { showToast } from '../../lib/toast';
+import { supabase } from '../../lib/supabase';
+import { useJadwal } from '../../lib/useJadwal';
+import { formatJam, formatSisa } from '../../shared/formatWaktu';
+import { DIVISI_OPTIONS, DIVISI_SHORT } from '../../shared/options';
+import { sortByAgenda, type Jadwal, type Slot } from '../../shared/slots';
+
+// Beranda: daftar jadwal.
+//
+// Dua aturan yang dibawa dari web dan tidak diubah di sini:
+//
+// - Jadwal yang waktunya sudah lewat tidak disembunyikan, tapi dipindahkan ke
+//   bawah dan diberi lencana Selesai. Disembunyikan membuat orang bertanya "kok
+//   jadwal kemarin tidak ada", padahal memang sudah tidak perlu dipantau
+// - Pengurutan memakai sortByAgenda dari shared/slots, yang sama dipakai web.
+//   Kalau aturannya berbeda, orang bisa melihat urutan berbeda untuk data yang
+//   sama di dua perangkat
+
+const KELIP_MS = 30 * 1000;
+
+export default function LayarBeranda() {
+  const { session } = useSesi();
+  const userId = session?.user.id ?? null;
+
+  const { jadwal, memuat, galat, muatUlang } = useJadwal(userId);
+
+  const [now, setNow] = useState(() => Date.now());
+  const [divisi, setDivisi] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ jadwal: Jadwal; sesi: Slot | null } | null>(null);
+  const [konfirmasi, setKonfirmasi] = useState<Jadwal | null>(null);
+  const [hapusSibuk, setHapusSibuk] = useState(false);
+  const [menyegarkan, setMenyegarkan] = useState(false);
+
+  // Waktu berjalan diperbarui tiap 30 detik supaya lencana Selesai muncul
+  // tanpa pengguna harus membuka ulang layar. Interval harus dibersihkan saat
+  // layar ditutup, kalau tidak ia tetap berjalan di latar.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), KELIP_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  const terlihat = useMemo(() => {
+    const dasar = divisi
+      ? jadwal.filter((item) => item.pembuat_divisi === divisi)
+      : jadwal;
+    return sortByAgenda(dasar, now);
+  }, [jadwal, divisi, now]);
+
+  const berikutnya = useMemo(() => {
+    for (const item of terlihat) {
+      if (item.status !== 'Aktif') continue;
+
+      const sesi = (
+        Array.isArray(item.slots) ? item.slots : []
+      )
+        .filter((s): s is Slot => Boolean(s?.mulai))
+        .find((s) => new Date(s.mulai).getTime() > now);
+
+      if (sesi) return { item, sesi };
+    }
+    return null;
+  }, [terlihat, now]);
+
+  const segarkan = useCallback(async () => {
+    setMenyegarkan(true);
+    try {
+      setNow(Date.now());
+      await muatUlang({ senyap: true });
+    } finally {
+      setMenyegarkan(false);
+    }
+  }, [muatUlang]);
+
+  /**
+   * Mengirim pengingat lewat endpoint yang sama dengan web: POST /api/notify
+   * dengan scheduleId dan token sesi. Endpoint itu ada di serverless Vercel,
+   * jadi tidak perlu backend baru untuk tahap ini.
+   */
+  const ingatkan = useCallback(async (item: Jadwal) => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        showToast('Sesi berakhir. Silakan keluar lalu masuk kembali.', 'galat');
+        return;
+      }
+
+      const respons = await fetch(apiUrl('/api/notify'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ scheduleId: item.id }),
+      });
+
+      if (!respons.ok) {
+        showToast(`Gagal mengirim (HTTP ${respons.status}).`, 'galat');
+        return;
+      }
+
+      showToast('Pengingat dikirim ke staf.', 'sukses');
+    } catch (galatKirim) {
+      showToast(`Gagal mengirim: ${String(galatKirim)}`, 'galat');
+    }
+  }, []);
+
+  const hapus = useCallback(async () => {
+    if (!konfirmasi) return;
+    setHapusSibuk(true);
+
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', konfirmasi.id);
+
+      if (error) {
+        showToast(`Gagal menghapus: ${error.message}`, 'galat');
+        return;
+      }
+
+      showToast('Jadwal dihapus.', 'sukses');
+      setDetail(null);
+      await muatUlang({ senyap: true });
+    } finally {
+      setHapusSibuk(false);
+      setKonfirmasi(null);
+    }
+  }, [konfirmasi, muatUlang]);
+
+  return (
+    <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={menyegarkan}
+            onRefresh={segarkan}
+            tintColor="#6b6b70"
+          />
+        }
+      >
+        <View className="flex-row items-end justify-between">
+          <View>
+            <Text className="text-xl font-bold text-bw-ink">Jadwal</Text>
+            <Text className="mt-0.5 text-sm text-bw-muted">
+              {terlihat.length} ditampilkan
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={segarkan}
+            accessibilityRole="button"
+            accessibilityLabel="Segarkan jadwal"
+            className="h-12 w-12 items-center justify-center rounded-full bg-bw-card active:opacity-70"
+          >
+            <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="mt-3"
+          contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+        >
+          <FilterChip
+            label="Semua"
+            aktif={divisi === null}
+            onPress={() => setDivisi(null)}
+          />
+          {DIVISI_OPTIONS.map((nama) => (
+            <FilterChip
+              key={nama}
+              label={DIVISI_SHORT[nama] ?? nama}
+              aktif={divisi === nama}
+              onPress={() => setDivisi(divisi === nama ? null : nama)}
+            />
+          ))}
+        </ScrollView>
+
+        {berikutnya ? (
+          <View className="mt-4 rounded-3xl border border-bw-blue-200 bg-bw-blue-50 p-4">
+            <View className="flex-row items-center gap-2">
+              <Ikon nama="alarm" token="bw-blue" ukuran={16} />
+              <Text className="text-xs font-bold uppercase tracking-wide text-bw-blue-700">
+                Berikutnya
+              </Text>
+            </View>
+            <Text className="mt-1 text-base font-bold text-bw-ink">
+              {berikutnya.item.judul}
+            </Text>
+            <Text className="mt-0.5 text-sm text-bw-blue-700">
+              {formatJam(berikutnya.sesi.mulai)} -{' '}
+              {formatSisa(new Date(berikutnya.sesi.mulai).getTime(), now)}
+            </Text>
+          </View>
+        ) : null}
+
+        {galat ? (
+          <View
+            accessibilityRole="alert"
+            className="mt-4 rounded-3xl border border-bw-red-100 bg-bw-red-50 p-4"
+          >
+            <Text className="text-sm font-bold text-bw-red">
+              Jadwal tidak bisa dimuat.
+            </Text>
+            <Text className="mt-1 text-xs leading-relaxed text-bw-red">
+              {galat}
+            </Text>
+            <Pressable
+              onPress={() => muatUlang()}
+              accessibilityRole="button"
+              className="mt-3 h-12 items-center justify-center rounded-xl bg-bw-red-solid active:opacity-80"
+            >
+              <Text className="text-sm font-bold text-white">Coba lagi</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {memuat && terlihat.length === 0 ? (
+          <Text className="mt-8 text-center text-sm text-bw-muted">
+            Memuat jadwal...
+          </Text>
+        ) : null}
+
+        {!memuat && terlihat.length === 0 && !galat ? (
+          <View className="mt-8 items-center rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10">
+            <Ikon nama="calendar-outline" token="bw-muted" ukuran={32} />
+            <Text className="mt-3 text-sm font-bold text-bw-ink">
+              Belum ada jadwal
+            </Text>
+            <Text className="mt-1 text-center text-xs leading-relaxed text-bw-muted">
+              Belum ada pengingat yang perlu dipantau. Jadwal baru dibuat dari
+              aplikasi web.
+            </Text>
+          </View>
+        ) : null}
+
+        <View className="mt-4 gap-3">
+          {terlihat.map((item) => (
+            <KartuJadwal
+              key={item.id}
+              jadwal={item}
+              now={now}
+              milikSaya={item.pembuat_id === userId}
+              onDetail={() => setDetail({ jadwal: item, sesi: null })}
+              onIngatkan={() => ingatkan(item)}
+              onUbah={() =>
+                showToast(
+                  'Ubah jadwal belum tersedia di aplikasi ini. Buka aplikasi web.',
+                  'info'
+                )
+              }
+              onHapus={() => setKonfirmasi(item)}
+            />
+          ))}
+        </View>
+      </ScrollView>
+
+      <ModalDetail
+        terbuka={Boolean(detail)}
+        jadwal={detail?.jadwal ?? null}
+        sesi={detail?.sesi ?? null}
+        now={now}
+        milikSaya={detail ? detail.jadwal.pembuat_id === userId : false}
+        onTutup={() => setDetail(null)}
+        onIngatkan={detail ? () => ingatkan(detail.jadwal) : undefined}
+        onHapus={detail ? () => setKonfirmasi(detail.jadwal) : undefined}
+      />
+
+      <DialogKonfirmasi
+        terbuka={Boolean(konfirmasi)}
+        judul="Hapus jadwal?"
+        pesan={
+          konfirmasi
+            ? `"${konfirmasi.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
+            : ''
+        }
+        sibuk={hapusSibuk}
+        onBatal={() => setKonfirmasi(null)}
+        onSetuju={hapus}
+      />
+    </SafeAreaView>
+  );
+}
+
+function FilterChip({
+  label,
+  aktif,
+  onPress,
+}: {
+  label: string;
+  aktif: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: aktif }}
+      className={`h-11 justify-center rounded-full border px-4 active:opacity-70 ${
+        aktif ? 'border-bw-blue bg-bw-blue' : 'border-bw-line bg-bw-card'
+      }`}
+    >
+      <Text
+        className={`text-xs font-bold ${aktif ? 'text-white' : 'text-bw-ink-2'}`}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}

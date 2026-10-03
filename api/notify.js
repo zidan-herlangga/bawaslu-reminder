@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
+import { apnsSiap, kirimKeNative, pushNativeSiap } from './lib/push-native.js';
 
 const REQUIRED_ENV = [
   'SUPABASE_URL',
@@ -162,12 +163,28 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!subscriptions || subscriptions.length === 0) {
+  const daftarWeb = subscriptions ?? [];
+
+  // Perangkat native dilampirkan pada pengiriman yang sama. Satu endpoint untuk
+  // web dan native, supaya aplikasi tidak perlu memilih jalurnya sendiri dan
+  // tidak ada dua tempat yang bisa gagal diam-diam.
+  const { data: deviceTokens, error: deviceError } = await admin
+    .from('device_tokens')
+    .select('user_id, token, platform')
+    .in('user_id', recipientIds);
+
+  if (deviceError) {
+    console.warn('[notify] gagal membaca token perangkat:', deviceError.message);
+  }
+
+  const daftarPerangkat = deviceTokens ?? [];
+
+  if (daftarWeb.length === 0 && daftarPerangkat.length === 0) {
     return reply(res, 200, {
       terkirim: recipients.length,
       push: 0,
       pesan,
-      catatan: 'Belum ada penerima yang mengaktifkan notifikasi browser.',
+      catatan: 'Belum ada penerima yang mengaktifkan notifikasi.',
     });
   }
 
@@ -178,43 +195,102 @@ export default async function handler(req, res) {
   );
 
   const expired = [];
-  const results = await Promise.allSettled(
-    subscriptions.map((item) => {
-      const payload = JSON.stringify({
-        title: label.judul,
-        body: pesan,
-        url: '/',
-        id: idByUser.get(item.user_id) ?? null,
-        kategori: schedule.kategori ?? null,
-        tag: `${label.tag}-${idByUser.get(item.user_id) ?? item.user_id}`,
-      });
+  const results = daftarWeb.length
+    ? await Promise.allSettled(
+        daftarWeb.map((item) => {
+          const payload = JSON.stringify({
+            title: label.judul,
+            body: pesan,
+            url: '/',
+            id: idByUser.get(item.user_id) ?? null,
+            kategori: schedule.kategori ?? null,
+            tag: `${label.tag}-${idByUser.get(item.user_id) ?? item.user_id}`,
+          });
 
-      return webpush
-        .sendNotification(
-          { endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth } },
-          payload
-        )
-        .catch((error) => {
-          const status = error?.statusCode;
-          if (status === 404 || status === 410) expired.push(item.endpoint);
-          throw error;
-        });
-    })
-  );
+          return webpush
+            .sendNotification(
+              {
+                endpoint: item.endpoint,
+                keys: { p256dh: item.p256dh, auth: item.auth },
+              },
+              payload
+            )
+            .catch((error) => {
+              const status = error?.statusCode;
+              if (status === 404 || status === 410) expired.push(item.endpoint);
+              throw error;
+            });
+        })
+      )
+    : [];
 
   if (expired.length > 0) {
     await admin.from('push_subscriptions').delete().in('endpoint', expired);
   }
 
-  const pushCount = results.filter((item) => item.status === 'fulfilled').length;
+  const pushWeb = results.filter((item) => item.status === 'fulfilled').length;
+
+  // Native dikirim terpisah dan tidak boleh menggagalkan hasil web. Kalau
+  // kredensial push native belum diisi, tahap ini dilewati diam-diam supaya
+  // notifikasi ke pengguna web tetap jalan.
+  let pushNative = 0;
+  const catatanNative = [];
+
+  const siapAndroid = pushNativeSiap();
+  const siapApple = apnsSiap();
+  const adaAndroid = daftarPerangkat.some((item) => item.platform === 'android');
+  const adaIos = daftarPerangkat.some((item) => item.platform === 'ios');
+
+  const perluAndroid = adaAndroid && siapAndroid;
+  const perluIos = adaIos && siapApple;
+
+  if (daftarPerangkat.length > 0 && (perluAndroid || perluIos)) {
+    const yangDikirim = daftarPerangkat.filter((item) =>
+      item.platform === 'ios' ? perluIos : perluAndroid
+    );
+
+    const hasilNative = await kirimKeNative(yangDikirim, {
+      title: label.judul,
+      body: pesan,
+      tag: `${label.tag}-${schedule.id}`,
+      data: {
+        schedule_id: schedule.id,
+        kategori: schedule.kategori ?? null,
+      },
+    });
+
+    pushNative = hasilNative.terkirim;
+
+    if (hasilNative.kedaluwarsa.length > 0) {
+      await admin.from('device_tokens').delete().in('token', hasilNative.kedaluwarsa);
+    }
+
+    if (hasilNative.alasan.length > 0) {
+      catatanNative.push(`${hasilNative.alasan.length} perangkat gagal: ${hasilNative.alasan[0]}`);
+    }
+  } else if (daftarPerangkat.length > 0) {
+    catatanNative.push(
+      'Token perangkat sudah terdaftar, tetapi kredensial push native belum diisi.'
+    );
+  }
+
+  const totalPerangkat = daftarWeb.length + daftarPerangkat.length;
+  const totalTerkirim = pushWeb + pushNative;
+  const catatan = [
+    totalTerkirim < totalPerangkat
+      ? `${totalPerangkat - totalTerkirim} perangkat tidak bisa dijangkau dan sudah dibersihkan.`
+      : '',
+    ...catatanNative,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return reply(res, 200, {
     terkirim: recipients.length,
-    push: pushCount,
+    push: totalTerkirim,
+    pushWeb,
+    pushNative,
     pesan,
-    catatan:
-      pushCount < subscriptions.length
-        ? `${subscriptions.length - pushCount} perangkat tidak bisa dijangkau dan sudah dibersihkan.`
-        : '',
+    catatan,
   });
 }

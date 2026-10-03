@@ -1,0 +1,298 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ikon } from '../../komponen/Ikon';
+import { useSesi } from '../../lib/session';
+import { showToast } from '../../lib/toast';
+import { supabase } from '../../lib/supabase';
+
+// Daftar tugas.
+//
+// Bentuk datanya sama dengan di web: satu baris teks, tanggal opsional, dan
+// tanda selesai. Yang dipindah ke sini adalah cara menandainya selesai, yang
+// memakai tombol lingkaran besar di kiri. Tanda centang kecil terlalu sulit
+// ditekuk dengan benar, dan salah menekan tanda selesai tidak merusak apa pun,
+// jadi tidak perlu dialog.
+//
+// Yang tetap memakai dialog adalah menghapus jadwal di halaman lain, karena
+// jadwal itu dibaca banyak orang.
+
+interface Todo {
+  id: string;
+  teks: string;
+  tanggal: string | null;
+  selesai: boolean;
+}
+
+const KOLOM = 'id, teks, tanggal, selesai, created_at';
+
+export default function LayarTugas() {
+  const { session } = useSesi();
+  const userId = session?.user.id ?? null;
+
+  const [daftar, setDaftar] = useState<Todo[]>([]);
+  const [memuat, setMemuat] = useState(true);
+  const [teks, setTeks] = useState('');
+  const [menambah, setMenambah] = useState(false);
+  const [galat, setGalat] = useState('');
+
+  const muat = useCallback(async () => {
+    if (!userId) return;
+
+    setMemuat(true);
+    const { data, error } = await supabase
+      .from('todos')
+      .select(KOLOM)
+      .order('created_at', { ascending: false });
+
+    if (!mounted.current) return;
+
+    if (error) {
+      setGalat(`Gagal memuat tugas: ${error.message}`);
+      setDaftar([]);
+    } else {
+      setGalat('');
+      setDaftar((data ?? []) as Todo[]);
+    }
+
+    setMemuat(false);
+  }, [userId]);
+
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    void muat();
+  }, [muat]);
+
+  // Realtime: tugas ikut berubah di perangkat lain.
+  useEffect(() => {
+    if (!userId) return undefined;
+
+    const channel = supabase
+      .channel(`tugas-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'todos' },
+        () => {
+          void muat();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, muat]);
+
+  const tambah = useCallback(async () => {
+    const isi = teks.trim();
+    if (!isi || !userId) return;
+
+    setMenambah(true);
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .insert({ teks: isi, selesai: false, user_id: userId });
+
+      if (error) {
+        showToast(`Gagal menambah: ${error.message}`, 'galat');
+        return;
+      }
+
+      setTeks('');
+      await muat();
+    } finally {
+      setMenambah(false);
+    }
+  }, [teks, userId, muat]);
+
+  const alihkan = useCallback(
+    async (todo: Todo) => {
+      if (!userId) return;
+
+      // Terapkan lebih dulu supaya tampilan terasa cepat, lalu cocokkan dengan
+      // jawaban server. Kalau gagal, kembalikan seperti semula.
+      const berikut = !todo.selesai;
+      setDaftar((sebelumnya) =>
+        sebelumnya.map((item) =>
+          item.id === todo.id ? { ...item, selesai: berikut } : item
+        )
+      );
+
+      const { error } = await supabase
+        .from('todos')
+        .update({ selesai: berikut })
+        .eq('id', todo.id);
+
+      if (error) {
+        setDaftar((sebelumnya) =>
+          sebelumnya.map((item) =>
+            item.id === todo.id ? { ...item, selesai: todo.selesai } : item
+          )
+        );
+        showToast(`Gagal menyimpan: ${error.message}`, 'galat');
+      }
+    },
+    []
+  );
+
+  const belum = daftar.filter((item) => !item.selesai);
+  const sudah = daftar.filter((item) => item.selesai);
+
+  return (
+    <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={muat} tintColor="#6b6b70" />
+        }
+      >
+        <Text className="text-xl font-bold text-bw-ink">Tugas</Text>
+        <Text className="mt-0.5 text-sm text-bw-muted">
+          {belum.length} belum selesai
+        </Text>
+
+        <View className="mt-4 flex-row gap-2">
+          <TextInput
+            value={teks}
+            onChangeText={setTeks}
+            placeholder="Tugas baru"
+            placeholderTextColor="#9a9aa0"
+            accessibilityLabel="Tulis tugas baru"
+            onSubmitEditing={tambah}
+            returnKeyType="done"
+            className="h-14 flex-1 rounded-2xl border border-bw-line bg-bw-card px-4 text-base text-bw-ink"
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tambah tugas"
+            onPress={tambah}
+            disabled={!teks.trim() || menambah}
+            className={`h-14 w-14 items-center justify-center rounded-2xl active:opacity-80 ${
+              teks.trim() && !menambah ? 'bg-bw-blue' : 'bg-bw-line'
+            }`}
+          >
+            <Ikon
+              nama="add"
+              ukuran={24}
+              token={teks.trim() && !menambah ? 'bw-blue-50' : 'bw-muted'}
+            />
+          </Pressable>
+        </View>
+
+        {galat ? (
+          <View
+            accessibilityRole="alert"
+            className="mt-4 rounded-2xl border border-bw-red-100 bg-bw-red-50 px-4 py-3"
+          >
+            <Text className="text-sm leading-relaxed text-bw-red">{galat}</Text>
+            <Pressable
+              onPress={muat}
+              accessibilityRole="button"
+              className="mt-3 h-12 items-center justify-center rounded-xl bg-bw-red-solid active:opacity-80"
+            >
+              <Text className="text-sm font-bold text-white">Coba lagi</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {memuat && daftar.length === 0 ? (
+          <Text className="mt-8 text-center text-sm text-bw-muted">Memuat...</Text>
+        ) : null}
+
+        {!memuat && daftar.length === 0 && !galat ? (
+          <View className="mt-8 items-center rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-10">
+            <Ikon nama="checkmark-done-outline" token="bw-muted" ukuran={32} />
+            <Text className="mt-3 text-sm font-bold text-bw-ink">
+              Belum ada tugas
+            </Text>
+            <Text className="mt-1 text-center text-xs leading-relaxed text-bw-muted">
+              Tulis di kolom di atas untuk menambah tugas pribadi.
+            </Text>
+          </View>
+        ) : null}
+
+        {belum.length > 0 ? (
+          <View className="mt-5 gap-2.5">
+            {belum.map((todo) => (
+              <BarisTugas key={todo.id} todo={todo} onAlih={alihkan} />
+            ))}
+          </View>
+        ) : null}
+
+        {sudah.length > 0 ? (
+          <>
+            <Text className="mt-6 text-xs font-bold uppercase tracking-wide text-bw-muted">
+              Sudah selesai ({sudah.length})
+            </Text>
+            <View className="mt-2 gap-2.5">
+              {sudah.map((todo) => (
+                <BarisTugas key={todo.id} todo={todo} onAlih={alihkan} />
+              ))}
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function BarisTugas({
+  todo,
+  onAlih,
+}: {
+  todo: Todo;
+  onAlih: (todo: Todo) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onAlih(todo)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: todo.selesai }}
+      accessibilityLabel={todo.teks}
+      className="flex-row items-center gap-3 rounded-2xl border border-bw-line bg-bw-card p-3.5 active:opacity-70"
+    >
+      <View
+        className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
+          todo.selesai
+            ? 'border-bw-green bg-bw-green'
+            : 'border-bw-line bg-transparent'
+        }`}
+      >
+        {todo.selesai ? (
+          <Ikon nama="checkmark" ukuran={16} token="bw-green-50" />
+        ) : null}
+      </View>
+
+      <View className="min-w-0 flex-1">
+        <Text
+          className={
+            todo.selesai
+              ? 'text-sm text-bw-muted line-through'
+              : 'text-sm font-semibold text-bw-ink'
+          }
+        >
+          {todo.teks}
+        </Text>
+        {todo.tanggal ? (
+          <Text className="mt-0.5 text-xs text-bw-muted">{todo.tanggal}</Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}

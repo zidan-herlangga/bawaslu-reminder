@@ -307,6 +307,45 @@ create policy "delete own push subscriptions"
   to authenticated
   using (auth.uid() = user_id);
 
+-- 7d. Token perangkat untuk aplikasi native (Expo, Android dan iOS)
+--
+-- Terpisah dari push_subscriptions dengan sengaja. Tabel itu menyimpan
+-- endpoint Web Push beserta kunci rahasianya, yang bentuknya tidak ada di
+-- native. Mencampur keduanya membuat satu perangkat bisa punya lebih dari satu
+-- jenis langganan dan membuat penghapusan lebih rumit.
+--
+-- Token di sini bukan rahasia: siapa pun yang memegangnya bisa mengirim
+-- notifikasi ke perangkat itu saja. Karena itu tabelnya read-only untuk
+-- pengguna dan hanya bisa ditambah atau dihapus, tidak bisa dibaca daftar
+-- token milik orang lain.
+create table if not exists public.device_tokens (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  token       text not null unique,
+  platform    text not null check (platform in ('android', 'ios')),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists device_tokens_user_idx
+  on public.device_tokens (user_id);
+
+alter table public.device_tokens enable row level security;
+
+-- Tidak ada policy select. Device tidak butuh membaca tokennya sendiri, dan
+-- menutup baca mencegah satu akun melihat token perangkat akun lain.
+
+drop policy if exists "insert own device tokens" on public.device_tokens;
+create policy "insert own device tokens"
+  on public.device_tokens for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "delete own device tokens" on public.device_tokens;
+create policy "delete own device tokens"
+  on public.device_tokens for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
 -- =====================================================================
 -- 8. Refresh schema cache PostgREST + verifikasi
 -- =====================================================================
