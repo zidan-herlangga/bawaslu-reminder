@@ -13,6 +13,29 @@ import { supabase } from './supabase';
 const POLL_AKTIF_MS = 30 * 1000;
 const POLL_SAMBUNG_MS = 90 * 1000;
 
+// Channel realtime WAJIB punya nama yang berbeda per pemanggil.
+//
+// RealtimeClient.channel() mencari channel yang sudah ada dengan topik yang
+// sama, lalu MENGEMBALIKAN channel itu apa adanya. Channel itu sudah
+// di-subscribe, jadi pemanggil kedua yang menuliskannya akan mendapat galat:
+//
+//   cannot add `postgres_changes` callbacks ... after `subscribe()`
+//
+// Di aplikasi web ini tidak muncul karena react-router hanya merender satu rute
+// pada satu waktu, jadi useSchedules hanya hidup di satu layar. Di Expo Router
+// semua tab tetap ter-mount bersamaan: Beranda dan Agenda sama-sama memanggil
+// useJadwal pada sesi yang sama. Kalau keduanya memakai nama channel yang sama,
+// layar kedua langsung meledak.
+//
+// Mengganti nama per pemanggil membuat setiap layar punya channel sendiri.
+// Bedanya satu koneksi websocket tambahan yang memang sudah dipakai bersama.
+let penghitungKanal = 0;
+
+export function namaKanalUnik(pAwalan: string): string {
+  penghitungKanal += 1;
+  return `${pAwalan}-${penghitungKanal}`;
+}
+
 export interface HasilJadwal {
   jadwal: Jadwal[];
   memuat: boolean;
@@ -28,6 +51,14 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
   const [terhubung, setTerhubung] = useState(false);
 
   const hidup = useRef(true);
+
+  // useRef, bukan useState: nama channel harus tetap sama saat StrictMode
+  // menjalankan ulang efek, supaya channel yang dibersihkan dan yang dibuat
+  // lagi benar-benar pasangan yang sama.
+  const namaKanal = useRef<string | null>(null);
+  if (namaKanal.current === null) {
+    namaKanal.current = namaKanalUnik('jadwal');
+  }
 
   useEffect(() => {
     hidup.current = true;
@@ -67,12 +98,12 @@ export function useJadwal(sessionId: string | null): HasilJadwal {
     muatUlang();
   }, [sessionId, muatUlang]);
 
-  // Realtime: satu channel per pengguna.
+  // Realtime: satu channel per pemanggil, bukan per pengguna.
   useEffect(() => {
     if (!sessionId) return undefined;
 
     const channel = supabase
-      .channel(`jadwal-${sessionId}`)
+      .channel(`${namaKanal.current}-${sessionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },

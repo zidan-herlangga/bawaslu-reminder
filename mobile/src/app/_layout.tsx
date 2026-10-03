@@ -6,6 +6,7 @@ import { vars } from 'nativewind';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import BatasGalat from '../komponen/BatasGalat';
 import { SesiProvider } from '../lib/session';
 import { TemaProvider, useTema } from '../tema/TemaProvider';
 
@@ -24,6 +25,10 @@ import { TemaProvider, useTema } from '../tema/TemaProvider';
 // variable mengembalikan objek style yang harus dipasang ke sebuah View, bukan
 // fungsi yang boleh dipanggil bebas; itu sebabnya warna tidak bisa dipasang
 // dari dalam provider.
+//
+// BatasGalat membungkus Stack, bukan provider di atasnya. Provider jarang yang
+// melempar galat, sedangkan tiap layar bisa. Satu layar yang gagal tidak boleh
+// membuat seluruh aplikasi kosong tanpa penjelasan.
 
 export default function LayoutAkar() {
   return (
@@ -31,7 +36,9 @@ export default function LayoutAkar() {
       <SafeAreaProvider>
         <TemaProvider>
           <SesiProvider>
-            <Akar />
+            <BatasGalat>
+              <Akar />
+            </BatasGalat>
           </SesiProvider>
         </TemaProvider>
       </SafeAreaProvider>

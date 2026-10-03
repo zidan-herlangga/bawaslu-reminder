@@ -12,6 +12,7 @@ import { Ikon } from '../../komponen/Ikon';
 import { useSesi } from '../../lib/session';
 import { showToast } from '../../lib/toast';
 import { supabase } from '../../lib/supabase';
+import { namaKanalUnik } from '../../lib/useJadwal';
 
 // Daftar tugas.
 //
@@ -73,6 +74,14 @@ export default function LayarTugas() {
     };
   }, []);
 
+  // Nama channel unik per pemanggil. Lihat catatan panjang di useJadwal.ts:
+  // Supabase mengembalikan channel yang sudah ada kalau topiknya sama, jadi
+  // dua layar yang memakai nama sama akan saling menabrak saat subscribe.
+  const namaKanal = useRef<string | null>(null);
+  if (namaKanal.current === null) {
+    namaKanal.current = namaKanalUnik('tugas');
+  }
+
   useEffect(() => {
     void muat();
   }, [muat]);
@@ -82,7 +91,7 @@ export default function LayarTugas() {
     if (!userId) return undefined;
 
     const channel = supabase
-      .channel(`tugas-${userId}`)
+      .channel(`${namaKanal.current}-${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'todos' },
