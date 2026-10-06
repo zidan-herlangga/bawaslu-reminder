@@ -53,7 +53,18 @@ function kumpulkan(dir, ekstensi, hasil = []) {
 
 const sql = readFileSync('supabase/schema.sql', 'utf8');
 
-/** Kolom yang dideklarasikan tiap tabel, dari blok create table. */
+/**
+ * Kolom yang dideklarasikan tiap tabel.
+ *
+ * Dua sumber ikut dibaca. Kolom di dalam blok create table, dan kolom yang
+ * ditambahkan belakangan dengan alter table ... add column.
+ *
+ * Yang kedua wajib dibaca. schedules.target_divisi ditambahkan lewat alter
+ * table, bukan create table, jadi kalau hanya create table yang diparse, kolom
+ * itu seolah-olah tidak ada di schema padahal ada di database. Test seperti ini
+ * lebih berbahaya daripada tidak ada test, karena ia melaporkan masalah yang
+ * tidak benar dan membuat orang mengejar bagian yang salah.
+ */
 function kolomPerTabel(sql) {
   const hasil = new Map();
 
@@ -75,6 +86,14 @@ function kolomPerTabel(sql) {
     }
 
     hasil.set(tabel, kolom);
+  }
+
+  for (const m of sql.matchAll(
+    /alter\s+table(?:\s+if\s+exists)?\s+(?:public\.)?(\w+)[\s\S]*?add\s+column(?:\s+if\s+not\s+exists)?\s+([a-z_][a-z0-9_]*)/gi
+  )) {
+    const [, tabel, kolom] = m;
+    if (!hasil.has(tabel)) hasil.set(tabel, new Set());
+    hasil.get(tabel).add(kolom);
   }
 
   return hasil;

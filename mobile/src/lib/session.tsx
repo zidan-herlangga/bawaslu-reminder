@@ -10,6 +10,7 @@ import {
 import * as Linking from 'expo-linking';
 import { pesanGalatAuth } from '../shared/daftar';
 import { supabase } from './supabase';
+import { daftarTokenPushDenganUlang } from './notifikasi';
 import type { HasilDaftar, NilaiPendaftaranTanpaSandi } from '../shared/daftar';
 
 // Sesi masuk, mengikuti pola src/hooks/useSession.js di web.
@@ -30,6 +31,16 @@ export interface NilaiSesi {
   /** Pesan galat terakhir, dibersihkan setelah dibaca. */
   galat: string;
   hapusGalat: () => void;
+  /**
+   * Divisi staf ini, atau null kalau belum diketahui.
+   *
+   * Dipakai untuk menyaring pengingat: jadwal yang menyasar divisi lain bukan
+   * urusan staf ini. Dimuat sekali di sini, bukan di tiap layar yang butuh,
+   * karena berkasnya satu dan semua pemanggil harus melihat nilai yang sama.
+   * Selama null, pengingat tetap ditampilkan: lebih baik satu pengingat yang
+   * mungkin tidak relevan daripada jadwal yang terlewat tanpa jejak.
+   */
+  divisi: string | null;
 }
 
 const KonteksSesi = createContext<NilaiSesi | null>(null);
@@ -67,6 +78,12 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [galat, setGalat] = useState('');
+  // Hasil pembacaan profil beserta pemiliknya. Disimpan berpasangan supaya nilai
+  // yang tertinggal dari sesi sebelumnya bisa dibuang tanpa menulis state lagi.
+  const [pembacaanDivisi, setPembacaanDivisi] = useState<{
+    userId: string;
+    divisi: string | null;
+  } | null>(null);
 
   useEffect(() => {
     let aktif = true;
@@ -99,6 +116,75 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
       langganan.subscription.unsubscribe();
     };
   }, []);
+
+  // Registrasi push dijalankan setiap kali sesi muncul, bukan hanya ketika
+  // layar Akun dibuka.
+  //
+  // Sebelumnya satu-satunya pemanggil ada di tab Akun. Akibatnya perangkat tidak
+  // pernah mendaftar push kecuali staf membuka layar itu: server tidak punya
+  // token, jadi tidak ada pesan yang bisa dikirim, dan tidak ada satu pun pesan
+  // galat yang menunjukkan hal ini karena pendaftarannya tidak pernah dijalankan
+  // sama sekali.
+  //
+  // Token perangkat tidak berubah antar sesi, jadi efek ini berjalan saat sesi
+  // ditemukan, bukan tiap render. Kegagalannya ditelan sebagai false: server
+  // yang tidak punya token tidak menghalangi staf bekerja, dan percobaan
+  // berikutnya tetap jalan saat aplikasi dibuka lagi.
+  //
+  // Fungsi ini sengaja dipakai di sini dan dibiarkan juga di tab Akun: kalau
+  // startup gagal karena jaringan, kunjungan ke Akun memberi satu percobaan
+  // lain tanpa harus menutup aplikasi.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    void daftarTokenPushDenganUlang(userId);
+  }, [session?.user?.id]);
+
+  // Divisi dibaca terpisah dari sesi karena ada di profiles, bukan auth.users.
+  // Dipakai hanya untuk menyaring pengingat; kegagalan membacanya tidak boleh
+  // mengeluarkan staf dari aplikasi, jadi nilainya dibiarkan null.
+  //
+  // Yang disimpan adalah hasil pembacaan beserta userId-nya, bukan divisi polos.
+  // Dengan begitu divisi bisa diturunkan saat render: ketika staf keluar, nilai
+  // lamanya otomatis tidak berlaku karena userId-nya tidak lagi cocok. Kalau
+  // divisi polos yang disimpan, pengosongannya harus lewat setState sinkron di
+  // dalam efek, dan itu memicu render berantai.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    let aktif = true;
+
+    void supabase
+      .from('profiles')
+      .select('divisi')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!aktif) return;
+        if (error) {
+          console.warn('[sesi] gagal membaca divisi:', error.message);
+          return;
+        }
+        const nilai = (data as { divisi?: string | null } | null)?.divisi ?? null;
+        setPembacaanDivisi({
+          userId,
+          divisi: nilai && nilai.trim() ? nilai.trim() : null,
+        });
+      });
+
+    return () => {
+      aktif = false;
+    };
+  }, [session?.user?.id]);
+
+  // Hanya berlaku untuk staf yang sedang masuk. Divisi yang tertinggal dari sesi
+  // sebelumnya tidak boleh ikut dipakai menyaring pengingat.
+  const divisi =
+    pembacaanDivisi && pembacaanDivisi.userId === session?.user?.id
+      ? pembacaanDivisi.divisi
+      : null;
 
   const masuk = useCallback(async (email: string, password: string) => {
     setGalat('');
@@ -228,8 +314,9 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
       aturSandiBaru,
       galat,
       hapusGalat,
+      divisi,
     }),
-    [session, loading, masuk, daftar, keluar, kirimTautanAturUlang, aturSandiBaru, galat, hapusGalat]
+    [session, loading, masuk, daftar, keluar, kirimTautanAturUlang, aturSandiBaru, galat, hapusGalat, divisi]
   );
 
   return <KonteksSesi.Provider value={nilai}>{children}</KonteksSesi.Provider>;

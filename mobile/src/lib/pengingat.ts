@@ -29,7 +29,7 @@
 // Jadwal bisa punya beberapa sesi, jadi yang perlu dihitung
 // shared/pengingat.ts dari slot yang dikembalikan kueri.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import {
   AMBANG_TELAT_MS,
@@ -72,7 +72,10 @@ export interface Pengingat {
  * - offline tidak menghasilkan pengingat berulang: kueri yang gagal tidak
  *   menandai sesi sebagai sudah ditampilkan
  */
-export function usePengingat(sessionId: string | null): {
+export function usePengingat(
+  sessionId: string | null,
+  divisi: string | null = null
+): {
   pengingat: Pengingat[];
   tandaiSudahDibaca: (kunci: string) => void;
 } {
@@ -98,7 +101,7 @@ export function usePengingat(sessionId: string | null): {
 
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, judul, status, waktu_mulai, waktu_selesai, slots')
+        .select('id, judul, status, waktu_mulai, waktu_selesai, slots, target_divisi')
         .eq('status', 'Aktif')
         .gte('waktu_mulai', dari)
         .lte('waktu_mulai', sampai);
@@ -107,10 +110,13 @@ export function usePengingat(sessionId: string | null): {
 
       const kandidat = sesiMasukJendela(
         data as BarisJadwal[],
-        Date.now()
+        now,
+        JENDELA_AWAL_MS,
+        AMBANG_TELAT_MS,
+        divisi
       );
 
-const baru = yangBelumDitampilkan(kandidat, sudahDitampilkan.current);
+      const baru = yangBelumDitampilkan(kandidat, sudahDitampilkan.current);
       if (baru.length === 0) return;
 
       // Ditandai hanya setelah kueri benar-benar berhasil. Kueri yang gagal
@@ -119,7 +125,7 @@ const baru = yangBelumDitampilkan(kandidat, sudahDitampilkan.current);
 
       // Kunci yang sesinya sudah lewat bisa dibuang supaya Set tidak menumpuk
       // terus selama aplikasi dipakai seharian.
-      for (const kunci of kunciBolehDilupakan(kandidat, Date.now())) {
+      for (const kunci of kunciBolehDilupakan(kandidat, now)) {
         sudahDitampilkan.current.delete(kunci);
       }
 
@@ -135,19 +141,22 @@ const baru = yangBelumDitampilkan(kandidat, sudahDitampilkan.current);
 
       // Yang paling baru tetap di slice terakhir supaya banner baru selalu terlihat
       // di atas, bukan tersembunyi di belakang yang lama.
-      setPengingat((sebelumnya) =>
-        [...sebelumnya, ...untukDitampilkan].slice(-MAKS_BANNER)
-      );
+      setPengingat((sebelumnya) => {
+        const tersisa = sebelumnya.filter((item) => {
+          const mulai = Number(item.kunci.split('@')[1]);
+          return Number.isFinite(mulai) && mulai >= now - AMBANG_TELAT_MS;
+        });
+        return [...tersisa, ...untukDitampilkan].slice(-MAKS_BANNER);
+      });
     } catch (galat) {
       console.warn('[pengingat] pemeriksaan gagal:', galat);
     } finally {
       sedangMemeriksa.current = false;
     }
-  }, [sessionId]);
+  }, [sessionId, divisi]);
 
   useEffect(() => {
     if (!sessionId) {
-      setPengingat([]);
       sudahDitampilkan.current.clear();
       return;
     }
@@ -172,16 +181,15 @@ const baru = yangBelumDitampilkan(kandidat, sudahDitampilkan.current);
     };
   }, [sessionId, periksa]);
 
-  // Banner yang sudah lewat tidak boleh menggantung di layar.
-  const aktif = useMemo(() => {
-    const now = Date.now();
-    return pengingat
-      .filter((item) => {
-        const mulai = Number(item.kunci.split('@')[1]);
-        return Number.isFinite(mulai) && mulai >= now - AMBANG_TELAT_MS;
-      })
-      .slice(0, MAKS_BANNER);
-  }, [pengingat]);
+  // Divisi yang baru termuat mengubah hasil penyaringan. Kandidat yang
+  // sebelumnya sudah ditandai ditampilkan harus dilupakan supaya jadwal milik
+  // divisi sendiri yang tadinya tersaring muncul sekarang, bukan terlewat
+  // sampai jendela waktunya lewat.
+  useEffect(() => {
+    if (!sessionId) return;
+    sudahDitampilkan.current.clear();
+    void periksa();
+  }, [divisi, sessionId, periksa]);
 
-  return { pengingat: aktif, tandaiSudahDibaca };
+  return { pengingat: sessionId ? pengingat : [], tandaiSudahDibaca };
 }

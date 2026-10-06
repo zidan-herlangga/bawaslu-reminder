@@ -9,7 +9,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BatasGalat from '../komponen/BatasGalat';
 import { PengingatHost } from '../komponen/PengingatHost';
 import { ToastHost } from '../komponen/ToastHost';
-import { SesiProvider } from '../lib/session';
+import { SesiProvider, useSesi } from '../lib/session';
+import { useNotifikasiJadwal } from '../lib/useNotifikasiJadwal';
 import { TemaProvider, useTema } from '../tema/TemaProvider';
 
 // Layout teratas.
@@ -60,6 +61,16 @@ export default function LayoutAkar() {
 
 function Akar() {
   const { variabel, dipakai } = useTema();
+  const { session, divisi } = useSesi();
+
+  // Dijadwalkan dari layout akar, bukan dari tiap layar. Notifikasi sistem
+  // harus ada selama aplikasi hidup, tidak hanya ketika tab Agenda kebetulan
+  // sedang terbuka. Kalau dijadwalkan per layar, menutup tab Agenda akan
+  // membatalkan pengingat yang sudah dijadwalkan.
+  //
+  // divisi diteruskan supaya jadwal milik divisi orang lain tidak berbunyi di
+  // ponsel staf ini.
+  useNotifikasiJadwal(session?.user?.id ?? null, divisi);
 
   return (
     <View style={[vars(variabel), { flex: 1 }]} className="flex-1 bg-bw-canvas">

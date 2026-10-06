@@ -11,10 +11,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { LampuRealtime } from '../../komponen/LampuRealtime';
+import { PilihTanggal } from '../../komponen/PilihTanggal';
 import { useSesi } from '../../lib/session';
 import { showToast } from '../../lib/toast';
 import { supabase } from '../../lib/supabase';
 import { namaKanalUnik } from '../../lib/useJadwal';
+import { formatTanggalPanjang } from '../../shared/formatWaktu';
+import {
+  TAB_TUGAS,
+  kelompokTugas,
+  normalkanTanggal,
+  tanggalHariIni,
+  visibleTugas,
+  type TabTugas,
+  type Tugas,
+} from '../../shared/tugas';
 
 // Daftar tugas.
 //
@@ -27,12 +38,9 @@ import { namaKanalUnik } from '../../lib/useJadwal';
 // Yang tetap memakai dialog adalah menghapus jadwal di halaman lain, karena
 // jadwal itu dibaca banyak orang.
 
-interface Todo {
-  id: string;
-  teks: string;
-  tanggal: string | null;
-  selesai: boolean;
-}
+// Bentuk barisnya dipakai bersama dengan modul tanggal, jadi didefinisikan satu
+// kali di sana.
+type Todo = Tugas;
 
 const KOLOM = 'id, teks, tanggal, selesai, created_at';
 
@@ -48,6 +56,11 @@ export default function LayarTugas() {
   const [menambah, setMenambah] = useState(false);
   const [galat, setGalat] = useState('');
   const [fokus, setFokus] = useState(false);
+
+  // Daftar tugas punya tanggal, dan tanggal yang sedang dilihat bisa diubah
+  // lewat tab. Sama seperti web, layar dibuka pada tab tanggal hari ini.
+  const [tab, setTab] = useState<TabTugas>('tanggal');
+  const [tanggal, setTanggal] = useState<string>(() => tanggalHariIni());
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -73,7 +86,12 @@ export default function LayarTugas() {
       setDaftar([]);
     } else {
       setGalat('');
-      setDaftar((data ?? []) as Todo[]);
+      setDaftar(
+        ((data ?? []) as Todo[]).map((item) => ({
+          ...item,
+          tanggal: normalkanTanggal(item.tanggal),
+        }))
+      );
     }
 
     setMemuat(false);
@@ -130,9 +148,17 @@ export default function LayarTugas() {
 
     setMenambah(true);
     try {
+      // Tanggal dikirim eksplisit, bukan diserahkan ke default kolom. Kalau
+      // pengguna sedang melihat tanggal lain lalu menambah tugas, tugas itu
+      // harus masuk ke tanggal yang sedang dilihat, bukan ke hari ini.
       const { error } = await supabase
         .from('todos')
-        .insert({ pemilik_id: userId, teks: isi, selesai: false });
+        .insert({
+          pemilik_id: userId,
+          teks: isi,
+          tanggal,
+          selesai: false,
+        });
 
       if (error) {
         showToast(`Gagal menambah: ${error.message}`, 'galat');
@@ -144,7 +170,7 @@ export default function LayarTugas() {
     } finally {
       setMenambah(false);
     }
-  }, [teks, userId, muat]);
+  }, [teks, userId, tanggal, muat]);
 
   const alihkan = useCallback(
     async (todo: Todo) => {
@@ -261,10 +287,16 @@ export default function LayarTugas() {
     }
   }, [hapusTarget]);
 
-  const belum = daftar.filter((item) => !item.selesai);
-  const sudah = daftar.filter((item) => item.selesai);
-  const persen = daftar.length > 0 ? Math.round((sudah.length / daftar.length) * 100) : 0;
+  // Semua angka di layar memakai daftar yang sedang terlihat, bukan seluruh
+  // data. Kalau tidak, ringkasan progres akan menghitung tugas yang tidak
+  // terlihat dan langsung bertentangan dengan daftarnya.
+  const terlihat = visibleTugas(daftar, tab, tanggal);
+  const { belum, sudah, persen } = kelompokTugas(terlihat);
   const bisaTambah = teks.trim().length > 0 && !menambah;
+  const jumlahHariIni = tanggal === tanggalHariIni();
+  // Kosong mencakup dua keadaan: belum punya tugas sama sekali, dan punya
+  // tugas tapi tidak ada yang cocok dengan tanggal yang sedang dilihat.
+  const kosong = !memuat && terlihat.length === 0 && !galat;
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
@@ -284,18 +316,37 @@ export default function LayarTugas() {
         {/* Header */}
         <Text className="text-3xl font-extrabold tracking-tight text-bw-ink">Tugas</Text>
         <Text className="mt-1 text-sm text-bw-muted">
-          {belum.length === 0 && daftar.length > 0
-            ? 'Semua tugas sudah selesai.'
-            : `${belum.length} belum selesai`}
+          {terlihat.length === 0
+            ? 'Tidak ada tugas di daftar ini.'
+            : belum.length === 0
+              ? 'Semua tugas sudah selesai.'
+              : `${belum.length} belum selesai`}
         </Text>
 
         <LampuRealtime terhubung={terhubung} />
 
+        {/* Tab tanggal */}
+        <View className="mt-5 flex-row gap-2">
+          {TAB_TUGAS.map((item) => (
+            <Chip
+              key={item.id}
+              label={item.label}
+              aktif={tab === item.id}
+              onPress={() => setTab(item.id)}
+            />
+          ))}
+        </View>
+
+        {/* Tanggal yang sedang dilihat */}
+        {tab === 'tanggal' ? (
+          <PilihTanggal nilai={tanggal} onUbah={setTanggal} />
+        ) : null}
+
         {/* Ringkasan progres */}
-        {daftar.length > 0 ? (
+        {terlihat.length > 0 ? (
           <View className="mt-5 rounded-[28px] border border-bw-line bg-bw-card p-5">
             <View className="flex-row items-end justify-between">
-              <View>
+              <View className="flex-1">
                 <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
                   Progres
                 </Text>
@@ -303,7 +354,7 @@ export default function LayarTugas() {
                   {sudah.length}
                   <Text className="text-base font-semibold text-bw-muted">
                     {' '}
-                    / {daftar.length} selesai
+                    / {terlihat.length} selesai
                   </Text>
                 </Text>
               </View>
@@ -388,14 +439,24 @@ export default function LayarTugas() {
         ) : null}
 
         {/* Kosong */}
-        {!memuat && daftar.length === 0 && !galat ? (
+        {kosong ? (
           <View className="mt-8 items-center rounded-[28px] border border-dashed border-bw-line bg-bw-card px-6 py-12">
             <View className="h-16 w-16 items-center justify-center rounded-full bg-bw-surface">
-              <Ikon nama="checkmark-done-outline" token="bw-muted" ukuran={30} />
+              <Ikon
+                nama={jumlahHariIni ? 'calendar-outline' : 'checkmark-done-outline'}
+                token="bw-muted"
+                ukuran={30}
+              />
             </View>
-            <Text className="mt-4 text-base font-bold text-bw-ink">Belum ada tugas</Text>
+            <Text className="mt-4 text-base font-bold text-bw-ink">
+              {jumlahHariIni ? 'Belum ada tugas hari ini' : 'Belum ada tugas'}
+            </Text>
             <Text className="mt-1.5 text-center text-xs leading-relaxed text-bw-muted">
-              Tulis di kolom di atas untuk menambah tugas pribadi.
+              {tab === 'tanggal'
+                ? jumlahHariIni
+                  ? 'Tulis di kolom di atas untuk menambah tugas hari ini.'
+                  : `Belum ada tugas pada ${formatTanggalPanjang(tanggal)}.`
+                : 'Daftar tugas masih kosong.'}
             </Text>
           </View>
         ) : null}
@@ -411,6 +472,7 @@ export default function LayarTugas() {
                 <BarisTugas
                   key={todo.id}
                   todo={todo}
+                  tampilkanTanggal={tab === 'semua'}
                   onAlih={alihkan}
                   sedangEdit={editId === todo.id}
                   draf={editDraf}
@@ -436,6 +498,7 @@ export default function LayarTugas() {
                 <BarisTugas
                   key={todo.id}
                   todo={todo}
+                  tampilkanTanggal={tab === 'semua'}
                   onAlih={alihkan}
                   sedangEdit={editId === todo.id}
                   draf={editDraf}
@@ -469,6 +532,7 @@ export default function LayarTugas() {
 
 function BarisTugas({
   todo,
+  tampilkanTanggal,
   onAlih,
   sedangEdit,
   draf,
@@ -479,6 +543,7 @@ function BarisTugas({
   onHapus,
 }: {
   todo: Todo;
+  tampilkanTanggal: boolean;
   onAlih: (todo: Todo) => void;
   sedangEdit: boolean;
   draf: string;
@@ -563,10 +628,14 @@ function BarisTugas({
           >
             {todo.teks}
           </Text>
-          {todo.tanggal ? (
+          {/* Tanggal per baris hanya perlu tampil di tab semua. Di tab
+              tanggal dipilih semua baris sudah jelas tanggalnya dari header. */}
+          {tampilkanTanggal && todo.tanggal ? (
             <View className="mt-1 flex-row items-center gap-1">
               <Ikon nama="calendar-outline" token="bw-muted" ukuran={12} />
-              <Text className="text-xs text-bw-muted">{todo.tanggal}</Text>
+              <Text className="text-xs text-bw-muted">
+                {formatTanggalPanjang(todo.tanggal)}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -636,6 +705,34 @@ function TombolAksi({
       <Ikon nama={ikon} ukuran={15} token={teksPutih ? 'bw-blue-50' : 'bw-ink-2'} />
       <Text
         className={`text-sm font-bold ${teksPutih ? 'text-white' : 'text-bw-ink-2'}`}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function Chip({
+  label,
+  aktif,
+  onPress,
+}: {
+  label: string;
+  aktif: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: aktif }}
+      className={`h-10 flex-1 items-center justify-center rounded-full border px-4 active:opacity-70 ${
+        aktif ? 'border-bw-blue bg-bw-blue' : 'border-bw-line bg-bw-card'
+      }`}
+    >
+      <Text
+        numberOfLines={1}
+        className={`text-xs font-bold ${aktif ? 'text-white' : 'text-bw-ink-2'}`}
       >
         {label}
       </Text>

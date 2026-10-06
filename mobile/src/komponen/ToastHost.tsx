@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { subscribeToast, type NadaToast, type PesanToast } from '../lib/toast';
+import type { TokenWarna } from '../tema/warna';
+import { Ikon, type NamaIkon } from './Ikon';
 
 /**
  * Apakah animasi boleh memakai driver native.
@@ -12,9 +14,6 @@ import { subscribeToast, type NadaToast, type PesanToast } from '../lib/toast';
  * animasi tetap berjalan, dan di native tetap berjalan di thread UI.
  */
 const PAKAI_DRIVER_NATIVE = Platform.OS !== 'web';
-
-import type { TokenWarna } from '../tema/warna';
-import { Ikon, type NamaIkon } from './Ikon';
 
 // Penampil toast. Dipasang satu kali di layout akar.
 //
@@ -56,7 +55,7 @@ const GAYA: Record<
 export function ToastHost() {
   const insets = useSafeAreaInsets();
   const [item, setItem] = useState<PesanToast | null>(null);
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bersihkanTimer = useCallback(() => {

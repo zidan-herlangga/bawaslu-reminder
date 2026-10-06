@@ -1,4 +1,8 @@
 node_modules
+
+# Hasil expo prebuild. Dibuat ulang oleh tool, bukan disunting manual.
+/android
+/ios
 dist
 dist-ios
 dist-web
@@ -8,6 +12,11 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Berisi API key milik project Firebase milik kita sendiri. Kuncinya ada di dalam
+# APK yang sekarang juga ada di tangan pengguna, tapi file ini tetap tidak perlu
+# masuk riwayat git.
+google-services.json
 
 logs
 *.log

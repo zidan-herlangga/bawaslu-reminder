@@ -7,9 +7,12 @@ import { useSesi } from '../../lib/session';
 import { supabase } from '../../lib/supabase';
 import { useTema, type PilihanTema } from '../../tema/TemaProvider';
 import {
+  alasanGagalDaftarPush,
   alasanTidakBisaDipakai,
+  bukaPengaturanSistem,
   cekIzinNotifikasi,
-  daftarTokenPush,
+  daftarTokenPushDenganUlang,
+  ingatkanSekarang,
   mintaIzinNotifikasi,
   pesanStatus,
   type StatusNotifikasi,
@@ -37,6 +40,13 @@ export default function LayarAkun() {
 
   const [profil, setProfil] = useState<Profil | null>(null);
   const [izinNotifikasi, setIzinNotifikasi] = useState<StatusNotifikasi>('belum');
+  // Hasil pendaftaran token push perangkat. Disimpan di state bukan untuk
+  // penampilan saja: pendaftaran ini gagal tanpa pesan galat apa pun kalau
+  // tidak berhasil, jadi tanpa baris ini staf tidak akan pernah tahu bahwa
+  // perangkatnya tidak terdaftar di server dan push memang tidak akan datang.
+  const [statusToken, setStatusToken] = useState<'proses' | 'terdaftar' | 'gagal'>(
+    'proses'
+  );
 
   useEffect(() => {
     if (!session) return;
@@ -68,7 +78,16 @@ export default function LayarAkun() {
     // Pendaftaran token hanya berguna kalau notifikasi sistem benar-benar
     // tersedia. Di Expo Go Android fungsi ini mengembalikan false dengan
     // cepat tanpa menyentuh expo-notifications, jadi aman dipanggil di mana saja.
-    void daftarTokenPush(session.user.id);
+    //
+    // Yang dipakai adalah versi yang mengulang. Satu kegagalan jaringan tidak
+    // boleh membuat perangkat ini tidak pernah menerima push, karena tidak ada
+    // proses lain yang akan mencoba lagi.
+    //
+    // Tidak ada setState sinkron di sini: nilai awal statusToken sudah
+    // 'proses', dan hanya hasil akhir dari promise yang menulis state.
+    void daftarTokenPushDenganUlang(session.user.id).then((berhasil) => {
+      setStatusToken(berhasil ? 'terdaftar' : 'gagal');
+    });
   }, [session]);
 
   const mintaIzin = useCallback(async () => {
@@ -97,6 +116,63 @@ export default function LayarAkun() {
     }
 
     showToast('Izin notifikasi belum diberikan.', 'info');
+  }, []);
+
+  const ujiNotifikasi = useCallback(async () => {
+    // Izin dicek lebih dulu supaya pesan yang muncul jujur. Tanpa pengecekan
+    // ini, notifikasi dijadwalkan lalu dibuang Android tanpa satu pun tanda,
+    // dan pengguna mengira fiturnya rusak padahal menolaknya sendiri.
+    const izin = await cekIzinNotifikasi();
+
+    if (izin === 'ekspo-go') {
+      showToast(
+        'Notifikasi butuh development build. Di Expo Go bagian ini tidak tersedia.',
+        'info'
+      );
+      return;
+    }
+
+    if (izin !== 'ya') {
+      showToast(
+        'Izin notifikasi belum diberikan. Tekan "Izin notifikasi" di atas dulu.',
+        'info'
+      );
+      return;
+    }
+
+    const terkirim = await ingatkanSekarang({
+      judul: 'BIBAZ Jadwal',
+      isi: 'Kalau notifikasi ini muncul, pengingat jadwal akan bekerja.',
+      // Waktu kosong membuat fungsi memakai satu detik dari sekarang, supaya
+      // hasilnya terlihat seketika tanpa perlu menunggu jadwal sungguhan.
+      mulaiIso: new Date().toISOString(),
+      jadwalId: 'uji',
+    });
+
+    if (!terkirim) {
+      showToast('Gagal menjadwalkan. Periksa pengaturan notifikasi HP.', 'galat');
+      return;
+    }
+
+    // Android tidak memberi tahu aplikasi kalau notifikasi dijatuhkan karena
+    // sakelar notifikasi aplikasi atau mode hemat baterai sedang mati: dari
+    // sisi kode, penjadwalan tetap dianggap berhasil. Kalau pesannya hanya
+    // "terkirim", pengguna akan menyimpulkan fiturnya rusak, padahal yang mati
+    // adalah sakelar di pengaturan sistem.
+    //
+    // Karena itu yang ditanyakan di sini adalah apa yang terlihat, bukan apa
+    // yang dikembalikan API.
+    Alert.alert(
+      'Notifikasi dijadwalkan',
+      'Kalau tidak muncul dalam beberapa detik, notifikasi dimatikan di pengaturan sistem, bukan rusak di aplikasi.\n\n' +
+        'Cek:\n' +
+        '1. Pengaturan HP > Notifikasi > BibaZ, pastikan sakelar aplikasi menyala.\n' +
+        '2. Untuk vivo/iQOO: Batasi Latar Belakang > aplikasi ini >Jangan batasi, agar tidak dihentikan otomatis.',
+      [
+        { text: 'Tutup', style: 'cancel' },
+        { text: 'Buka pengaturan', onPress: () => void bukaPengaturanSistem() },
+      ]
+    );
   }, []);
 
   const konfirmasiKeluar = useCallback(() => {
@@ -159,7 +235,7 @@ export default function LayarAkun() {
         </View>
 
         <Bagian judul="Tampilan">
-          <PilihanTema
+          <PemilihTema
             nilai={pilihan}
             onPilih={(nilai) => setPilihan(nilai as PilihanTema)}
           />
@@ -181,9 +257,48 @@ export default function LayarAkun() {
             onTekan={izinNotifikasi === 'ekspo-go' ? undefined : mintaIzin}
           />
           <Baris
+            ikon="cloud-upload-outline"
+            judul="Push dari server"
+            keterangan={
+              statusToken === 'proses'
+                ? 'Mendaftarkan perangkat...'
+                : statusToken === 'terdaftar'
+                  ? 'Perangkat terdaftar. Pengingat sampai walau aplikasi ditutup.'
+                  : `Belum terdaftar di server. Tekan baris ini untuk mencoba lagi.${
+                      alasanGagalDaftarPush() ? `\nAlasan: ${alasanGagalDaftarPush()}` : ''
+                    }`
+            }
+            onTekan={
+              statusToken === 'gagal' && session
+                ? () => {
+                    setStatusToken('proses');
+                    void daftarTokenPushDenganUlang(session.user.id).then((ok) =>
+                      setStatusToken(ok ? 'terdaftar' : 'gagal')
+                    );
+                  }
+                : undefined
+            }
+          />
+          <Baris
             ikon="alarm-outline"
             judul="Pengingat dalam aplikasi"
             keterangan="Aktif"
+            terakhir
+          />
+        </Bagian>
+
+        <Bagian
+          judul="Notifikasi sistem"
+          catatan={
+            alasanTidakBisaDipakai() ??
+              'Uji dulu supaya jelas notifikasi benar-benar keluar di perangkat ini. Kalau tombol ini tidak muncul apa pun, periksa izin notifikasi dan pengaturan suara HP.'
+          }
+        >
+          <Baris
+            ikon="notifications"
+            judul="Uji notifikasi"
+            keterangan={alasanTidakBisaDipakai() ? 'Tidak tersedia' : 'Kirim sekarang'}
+            onTekan={alasanTidakBisaDipakai() ? undefined : ujiNotifikasi}
             terakhir
           />
         </Bagian>
@@ -288,7 +403,7 @@ function Baris({
   );
 }
 
-function PilihanTema({
+function PemilihTema({
   nilai,
   onPilih,
 }: {

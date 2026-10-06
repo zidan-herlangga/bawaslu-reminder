@@ -34,8 +34,6 @@ export default function LayarMasuk() {
   const [email, setEmail] = useState('');
   const [sandi, setSandi] = useState('');
   const [sibuk, setSibuk] = useState(false);
-  const [fokus, setFokus] = useState<'email' | 'sandi' | null>(null);
-  const [lihatSandi, setLihatSandi] = useState(false);
   const refSandi = useRef<TextInput>(null);
 
   if (!loading && session) {
@@ -85,11 +83,7 @@ export default function LayarMasuk() {
 
             {/* Formulir */}
             <View className="mt-9 rounded-[28px] border border-bw-line bg-bw-card p-5">
-              <Text className="text-lg font-extrabold text-bw-ink">Masuk</Text>
-              <Text className="mt-0.5 text-xs text-bw-muted">
-                Gunakan akun yang sudah didaftarkan administrator.
-              </Text>
-
+              <Text className="text-lg font-extrabold text-bw-ink mb-2">Masuk</Text>
               <BidangAuth
                 label="Email"
                 nilai={email}
@@ -166,14 +160,6 @@ export default function LayarMasuk() {
                   Lupa kata sandi?
                 </Text>
               </Pressable>
-
-              <View className="mt-1 flex-row items-start justify-center gap-2 px-2">
-                <Ikon nama="shield-checkmark-outline" token="bw-muted" ukuran={14} />
-                <Text className="flex-1 text-center text-xs leading-relaxed text-bw-muted">
-                  Hanya untuk staf yang sudah terdaftar. Hubungi administrator
-                  bila butuh akses.
-                </Text>
-              </View>
             </View>
           </View>
         </ScrollView>

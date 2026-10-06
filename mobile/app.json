@@ -41,7 +41,12 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -49,12 +54,31 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "color": "#0071e3",
+          "defaultChannel": "pengingat-jadwal",
+          "icon": "./assets/notification-icon.png",
+          "sounds": [
+            "./assets/sounds/notification.wav",
+            "./assets/sounds/rapat.wav",
+            "./assets/sounds/tugas.wav",
+            "./assets/sounds/pengawasan.wav"
+          ]
+        }
+      ],
       "expo-calendar",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c6d58d52-42c8-40f4-bff4-5b601769ce16"
+      }
     }
   }
 }

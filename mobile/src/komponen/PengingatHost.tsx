@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePengingat, type Pengingat } from '../lib/pengingat';
 import { useSesi } from '../lib/session';
+import { Ikon } from './Ikon';
 
 /**
  * Apakah animasi boleh memakai driver native.
@@ -13,8 +14,6 @@ import { useSesi } from '../lib/session';
  * animasi tetap berjalan, dan di native tetap berjalan di thread UI.
  */
 const PAKAI_DRIVER_NATIVE = Platform.OS !== 'web';
-
-import { Ikon } from './Ikon';
 
 // Banner pengingat di dalam aplikasi.
 //
@@ -40,7 +39,7 @@ function BarisPengingat({
   item: Pengingat;
   onTutup: (kunci: string) => void;
 }) {
-  const geser = useRef(new Animated.Value(0)).current;
+  const [geser] = useState(() => new Animated.Value(0));
   const [terlihat, setTerlihat] = useState(true);
 
   useEffect(() => {
@@ -106,8 +105,8 @@ function BarisPengingat({
 }
 
 export function PengingatHost() {
-  const { session } = useSesi();
-  const { pengingat, tandaiSudahDibaca } = usePengingat(session?.user?.id ?? null);
+  const { session, divisi } = useSesi();
+  const { pengingat, tandaiSudahDibaca } = usePengingat(session?.user?.id ?? null, divisi);
   const insets = useSafeAreaInsets();
 
   if (pengingat.length === 0) return null;

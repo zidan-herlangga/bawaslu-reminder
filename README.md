@@ -242,8 +242,20 @@ Skrip ini mengirim satu notifikasi uji ke setiap endpoint yang tersimpan di
 | `MATI` dengan HTTP 404 atau 410 | Subscription sudah tidak valid, hapus barisnya |
 
 Endpoint yang mati sebaiknya dihapus karena setiap pengiriman berikutnya akan
-percuma dan menambah satu permintaan gagal. `api/notify.js` sudah-membersihkan
-otomatis saat menerima 404 atau 410, tapi cleaned manual bisa lebih cepat.
+percuma dan menambah satu permintaan gagal. `api/notify.js` sudah membersihkan
+otomatis saat menerima 404 atau 410, tapi pembersihan manual bisa lebih cepat.
+
+`push:cek` hanya menyentuh push web. Untuk memeriksa push ke ponsel, pakai
+skrip yang lebih luas:
+
+```bash
+npm run push:siap
+```
+
+Skrip itu memeriksa credential server, konfigurasi Firebase di aplikasi, dan
+jumlah baris di `push_subscriptions` serta `device_tokens`, lalu mencetak apa
+saja yang masih kurang. Jalankan ini lebih dulu sebelum menebak-nebak kenapa
+ponsel tidak berdering.
 
 ---
 
@@ -354,6 +366,15 @@ Dicatat apa adanya supaya tidak ada yang mengira sudah beres:
 - **Route `/jadwal/baru` belum punya penjaga role.** Halaman ini terbuka untuk
   semua pengguna yang sudah masuk. Kalau RLS `schedules` masih longgar, staf
   bisa membuat jadwal atas nama sendiri. Layak ditutup dengan penjaga role.
+- **Pengiriman otomatis per jadwal belum aktif.** Endpoint
+  `/api/pengingat-terjadwal` sudah ada dan teruji, dan jadwal SQL untuk
+  `pg_cron` sudah ditulis, tetapi keduanya belum dijalankan. Menjadwalkan juga
+  butuh URL Vercel produksi, yang belum diketahui.
+- **Push ke ponsel belum aktif.** Belum ada `google-services.json` dan belum
+  ada credential FCM, jadi tabel `device_tokens` masih kosong. Pengingat lokal
+  di dalam aplikasi sudah terbukti bekerja di perangkat nyata; yang belum ada
+  adalah kiriman dari server saat aplikasi ditutup. Lihat
+  `mobile/README.md` untuk urutan langkahnya.
 - **Tampilan belum pernah dilihat langsung.** Semua perubahan antarmuka
   diverifikasi lewat audit kode dan perhitungan kontras, bukan lewat mata.
 - **Suara belum pernah didengar.** Perbaikannya terbukti benar secara logika dan

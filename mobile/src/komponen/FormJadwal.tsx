@@ -21,7 +21,7 @@ import {
   galatPertama,
   susunPayload,
   validasiJadwal,
-  type FormJadwal,
+  type FormJadwal as BentukFormJadwal,
   type GalatJadwal,
 } from '../shared/validasiJadwal';
 
@@ -56,14 +56,14 @@ export default function FormJadwal({
   mode: ModeForm;
   /** Wajib saat mode 'ubah'. Bentuk FormJadwal sendiri tidak punya kolom id. */
   idJadwal?: string;
-  nilaiAwal: FormJadwal;
+  nilaiAwal: BentukFormJadwal;
   userId: string;
   email: string | null;
   profil: ProfilPembuat;
   onTutup: () => void;
   onSelesai: () => void;
 }) {
-  const [form, setForm] = useState<FormJadwal>(nilaiAwal);
+  const [form, setForm] = useState<BentukFormJadwal>(nilaiAwal);
   const [galat, setGalat] = useState<GalatJadwal[]>([]);
   const [galatUmum, setGalatUmum] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
@@ -71,7 +71,7 @@ export default function FormJadwal({
   const galatJudul = galat.find((item) => item.jenis === 'judul');
   const galatTarget = galat.find((item) => item.jenis === 'target');
 
-  const bersihkanGalat = useCallback((kunci: keyof FormJadwal) => {
+  const bersihkanGalat = useCallback((kunci: keyof BentukFormJadwal) => {
     // Nama kolom form tidak selalu sama dengan jenis galatnya:
     // targetDivisi -> 'target', slots -> 'slot'. Tanpa pemetaan ini galat
     // penerima pengingat tidak pernah hilang setelah pilihan diganti.
@@ -85,7 +85,7 @@ export default function FormJadwal({
   }, []);
 
   const ubah = useCallback(
-    <K extends keyof FormJadwal>(kunci: K, nilai: FormJadwal[K]) => {
+    <K extends keyof BentukFormJadwal>(kunci: K, nilai: BentukFormJadwal[K]) => {
       setForm((sebelumnya) => ({ ...sebelumnya, [kunci]: nilai }));
       bersihkanGalat(kunci);
     },

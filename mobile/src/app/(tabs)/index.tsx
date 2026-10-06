@@ -5,13 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { KartuJadwal } from '../../komponen/KartuJadwal';
+import { KotakNotifikasi } from '../../komponen/KotakNotifikasi';
 import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { ModalDetail } from '../../komponen/ModalDetail';
-import { apiUrl } from '../../lib/api';
+import { TombolNotifikasi } from '../../komponen/TombolNotifikasi';
+import { beriTahuStaf } from '../../lib/kabarStaf';
 import { useSesi } from '../../lib/session';
 import { showToast } from '../../lib/toast';
 import { supabase } from '../../lib/supabase';
 import { useJadwal } from '../../lib/useJadwal';
+import { useKotakNotifikasi } from '../../lib/useKotakNotifikasi';
 import { formatJam, formatSisa } from '../../shared/formatWaktu';
 import { DIVISI_OPTIONS, DIVISI_SHORT } from '../../shared/options';
 import { sortByAgenda, type Jadwal, type Slot } from '../../shared/slots';
@@ -35,6 +38,21 @@ export default function LayarBeranda() {
   const userId = session?.user.id ?? null;
 
   const { jadwal, memuat, galat, terhubung, muatUlang } = useJadwal(userId);
+
+  // Kotak masuk notifikasi hidup di Beranda, bukan di layout akar, supaya tidak
+  // ada permintaan jaringan yang berjalan di layar yang sedang tidak terlihat.
+  // Badge tetap harus benar sejak layar pertama dibuka, jadi hook tetap dipasang
+  // di sini dan bukan lazily saat lonceng diketuk.
+  const {
+    notifikasi,
+    belumDibaca,
+    memuat: notifikasiMemuat,
+    galat: notifikasiGalat,
+    tandaiDibaca,
+    tandaiSemuaDibaca,
+    muatUlang: muatNotifikasi,
+  } = useKotakNotifikasi(userId);
+  const [kotakTerbuka, setKotakTerbuka] = useState(false);
 
   const [now, setNow] = useState(() => Date.now());
   const [divisi, setDivisi] = useState<string | null>(null);
@@ -87,34 +105,19 @@ export default function LayarBeranda() {
    * Mengirim pengingat lewat endpoint yang sama dengan web: POST /api/notify
    * dengan scheduleId dan token sesi. Endpoint itu ada di serverless Vercel,
    * jadi tidak perlu backend baru untuk tahap ini.
+   *
+   * Memakai beriTahuStaf, bukan fetch sendiri: helper itu sudah menangani sesi
+   * yang habis, tidak ada koneksi, dan HTTP non-2xx. Versi sebelumnya membuang
+   * badan jawaban server, jadi "Hanya pembuat jadwal yang boleh mengirim
+   * pengingat." tidak pernah sampai ke pengguna dan yang tampil hanya
+   * "Gagal mengirim (HTTP 403)".
    */
   const ingatkan = useCallback(async (item: Jadwal) => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) {
-        showToast('Sesi berakhir. Silakan keluar lalu masuk kembali.', 'galat');
-        return;
-      }
-
-      const respons = await fetch(apiUrl('/api/notify'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ scheduleId: item.id }),
-      });
-
-      if (!respons.ok) {
-        showToast(`Gagal mengirim (HTTP ${respons.status}).`, 'galat');
-        return;
-      }
-
-      showToast('Pengingat dikirim ke staf.', 'sukses');
-    } catch (galatKirim) {
-      showToast(`Gagal mengirim: ${String(galatKirim)}`, 'galat');
-    }
+    const hasil = await beriTahuStaf(item.id);
+    showToast(
+      hasil.ok ? 'Pengingat dikirim ke staf.' : `Gagal mengirim. ${hasil.alasan}`,
+      hasil.ok ? 'sukses' : 'galat'
+    );
   }, []);
 
   const hapus = useCallback(async () => {
@@ -177,6 +180,11 @@ export default function LayarBeranda() {
             >
               <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
             </Pressable>
+
+            <TombolNotifikasi
+              belumDibaca={belumDibaca}
+              onPress={() => setKotakTerbuka(true)}
+            />
 
             <Pressable
               onPress={() => router.push('/jadwal/baru')}
@@ -312,19 +320,41 @@ export default function LayarBeranda() {
         onHapus={detail ? () => setKonfirmasi(detail.jadwal) : undefined}
       />
 
-      <DialogKonfirmasi
-        terbuka={Boolean(konfirmasi)}
-        judul="Hapus jadwal?"
-        pesan={
-          konfirmasi
-            ? `"${konfirmasi.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
-            : ''
-        }
-        sibuk={hapusSibuk}
-        onBatal={() => setKonfirmasi(null)}
-        onSetuju={hapus}
-      />
-    </SafeAreaView>
+<DialogKonfirmasi
+              terbuka={Boolean(konfirmasi)}
+              judul="Hapus jadwal?"
+              pesan={
+                konfirmasi
+                  ? `"${konfirmasi.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
+                  : ''
+              }
+              sibuk={hapusSibuk}
+              onBatal={() => setKonfirmasi(null)}
+              onSetuju={hapus}
+            />
+
+            <KotakNotifikasi
+              terbuka={kotakTerbuka}
+              notifikasi={notifikasi}
+              belumDibaca={belumDibaca}
+              memuat={notifikasiMemuat}
+              galat={notifikasiGalat}
+              onTutup={() => setKotakTerbuka(false)}
+              onBukaJadwal={(jadwalId) => {
+                setKotakTerbuka(false);
+                router.push(`/jadwal/${jadwalId}`);
+              }}
+              onTandaiDibaca={(id) => {
+                void tandaiDibaca(id);
+              }}
+              onTandaiSemuaDibaca={() => {
+                void tandaiSemuaDibaca();
+              }}
+              onCobaLagi={() => {
+                void muatNotifikasi();
+              }}
+            />
+          </SafeAreaView>
   );
 }
 

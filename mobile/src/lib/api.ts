@@ -12,21 +12,47 @@
 //
 //   npx expo start -c
 
+import { Platform } from 'react-native';
+
 const asal = process.env.EXPO_PUBLIC_API_ORIGIN;
 
-if (!asal) {
+export const API_ORIGIN = (asal ?? '').trim().replace(/\/+$/, '');
+
+/**
+ * True kalau asal menunjuk ke perangkat itu sendiri.
+ *
+ * Nilai localhost benar saat pengembangan di komputer, karena server Vite
+ * berjalan di komputer yang sama. Di HP, artinya berubah: localhost di dalam
+ * HP adalah HP itu sendiri, bukan komputer pengembang. Setiap permintaan ke
+ * alamat itu gagal dengan galat jaringan yang tidak menyebut localhost sama
+ * sekali, sehingga penyebabnya tidak akan pernah ditebak.
+ *
+ * Fungsi ini hanya memberi peringatan, bukan menolak. Menolak lebih awal akan
+ * mematikan fitur yang mungkin masih berguna, sedangkan peringatan cukup
+ * membuat penyebabnya terlihat tanpa mengubah perilaku apa pun.
+ */
+function asalMenunjukKePerangkatSendiri(): boolean {
+  if (Platform.OS === 'web') return false;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(API_ORIGIN);
+}
+
+if (!API_ORIGIN) {
   console.warn(
     '[api] EXPO_PUBLIC_API_ORIGIN belum diisi. Fitur Ingatkan akan gagal. ' +
       'Salin .env.example menjadi .env lalu isi nilainya.'
   );
-} else if (!/^https?:\/\//i.test(asal)) {
+} else if (!/^https?:\/\//i.test(API_ORIGIN)) {
   console.warn(
     '[api] EXPO_PUBLIC_API_ORIGIN harus diawali http:// atau https://, ' +
-      `nilai sekarang: "${asal}".`
+      `nilai sekarang: "${API_ORIGIN}".`
+  );
+} else if (asalMenunjukKePerangkatSendiri()) {
+  console.warn(
+    `[api] EXPO_PUBLIC_API_ORIGIN masih "${API_ORIGIN}". Nilai itu menunjuk ke ` +
+      'perangkat itu sendiri, bukan ke server. Di HP, localhost berarti HP. ' +
+      'Ganti dengan alamat Vercel yang terlihat saat membuka aplikasi di browser.'
   );
 }
-
-export const API_ORIGIN = (asal ?? '').trim().replace(/\/+$/, '');
 
 export function apiUrl(jalur: string): string {
   // Tanpa asal, hasilnya hanya jalur relatif yang tidak bisa dipakai fetch di

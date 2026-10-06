@@ -21,6 +21,14 @@ export interface SumberPengingat {
   id: string;
   judul: string;
   status?: string | null;
+  /**
+   * Divisi yang jadi sasaran jadwal ini, atau null bila untuk semua orang.
+   *
+   * Tanpa ini, penyaringan divisi jadi tidak menentukan: kebijakan "read all
+   * schedules" di schema berarti setiap staf bisa membaca seluruh jadwal, jadi
+   * penyaringan divisi harus terjadi di sisi aplikasi, bukan di database.
+   */
+  target_divisi?: string | null;
   slots: readonly SlotSederhana[];
 }
 
@@ -53,22 +61,25 @@ export interface KandidatPengingat {
  *   Selesai tidak perlu karena waktunya sudah lewat.
  * - Satu pengingat per sesi, bukan per jadwal. Jadwal berlapis beberapa hari
  *   harus diingatkan tiap sesinya.
- * - Kalau beberapa sesi dari jadwal sama-sama masuk jendela, yang paling awal
+* - Kalau beberapa sesi dari jadwal sama-sama masuk jendela, yang paling awal
  *   saja. Mengingatkan dua kali untuk jadwal yang sama di menit yang sama
  *   hanya membingungkan.
  * - Sesi dengan waktu tidak valid dilewati, bukan membuat galat.
+ * - Jadwal yang menyasar divisi lain tidak diingatkan sama sekali.
  */
 export function kandidatPengingat(
   sumber: readonly (SumberPengingat | null | undefined)[],
   now: number,
   jendelaMs: number = JENDELA_AWAL_MS,
-  ambangTelatMs: number = AMBANG_TELAT_MS
+  ambangTelatMs: number = AMBANG_TELAT_MS,
+  divisi: string | null = null
 ): KandidatPengingat[] {
   const hasil: KandidatPengingat[] = [];
 
   for (const item of sumber) {
     if (!item?.id) continue;
     if (item.status && item.status !== 'Aktif') continue;
+    if (!untukDivisi(item, divisi)) continue;
 
     const sesi = (item.slots ?? [])
       .map((slot) => new Date(slot.mulai).getTime())
@@ -173,6 +184,45 @@ export interface BarisJadwal {
   waktu_mulai: string | null;
   waktu_selesai: string | null;
   slots: BarisSlot[] | null;
+  /** Divisi sasaran. Null atau kosong berarti untuk semua orang. */
+  target_divisi?: string | null;
+  /**
+   * Kategori jadwal (Rapat, Tugas, Pengawasan, ...). Dipakai untuk memilih
+   * nada notifikasi sistem yang sesuai. Kolomnya opsional karena ada pemanggil
+   * yang tidak ikut membacanya.
+   */
+  kategori?: string | null;
+}
+
+/**
+ * Apakah jadwal ini perlu diingatkan oleh staf di divisi tertentu.
+ *
+ * Aturannya sama persis dengan yang dipakai web (src/hooks/useDueReminder.js):
+ * jadwal yang punya target_divisi hanya diingatkan oleh staf di divisi itu,
+ * sedangkan jadwal tanpa target_divisi diingatkan setiap orang.
+ *
+ * Dua kasus yang sengaja diperlakukan sebagai "milik semua orang":
+ * - target_divisi kosong atau hanya spasi: tidak ada sasaran yang jelas, jadi
+ *   lebih baik ditampilkan daripada hilang.
+ * - divisi pengguna belum diketahui, karena profil belum termuat atau sedang
+ *   offline. Menyembunyikan pengingat sampai profil tiba akan membuat jadwal
+ *   yang bisa terlewat tanpa jejak; memunculkan satu pengingat yang mungkin
+ *   tidak relevan lebih bisa diterima dan lebih mudah dilaporkan.
+ *
+ * Perbandingan dilakukan apa adanya terhadap string yang sama persis. Daftar
+ * divisi di src/constants/options.js adalah sumber tunggalnya, jadi nilai dari
+ * database dan dari formulir pendaftaran seharusnya sudah sama. Menormalkan di
+ * sini akan menyembunyikan ketidakcocokan data yang lebih baik terlihat di Akun.
+ */
+export function untukDivisi(
+  sumber: SumberPengingat,
+  divisi: string | null
+): boolean {
+  const target = sumber.target_divisi;
+  if (!target || !target.trim()) return true;
+  if (!divisi || !divisi.trim()) return true;
+
+  return target.trim() === divisi.trim();
 }
 
 /** Sesi-sesi pada satu baris jadwal, selalu dalam bentuk yang bisa dihitung. */
@@ -201,17 +251,20 @@ export function sesiMasukJendela(
   jadwal: readonly BarisJadwal[],
   now: number,
   jendelaMs: number = JENDELA_AWAL_MS,
-  ambangTelatMs: number = AMBANG_TELAT_MS
+  ambangTelatMs: number = AMBANG_TELAT_MS,
+  divisi: string | null = null
 ): KandidatPengingat[] {
   return kandidatPengingat(
     jadwal.map((baris) => ({
       id: baris.id,
       judul: baris.judul ?? '',
       status: baris.status,
+      target_divisi: baris.target_divisi ?? null,
       slots: normalisasiSlot(baris),
     })),
     now,
     jendelaMs,
-    ambangTelatMs
+    ambangTelatMs,
+    divisi
   );
 }

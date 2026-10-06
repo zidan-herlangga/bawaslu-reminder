@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSesi } from '../../lib/session';
+import { useTema } from '../../tema/TemaProvider';
+import { useWarna } from '../../tema/warna';
 
 // Tab bawah.
 //
@@ -13,9 +15,11 @@ import { useSesi } from '../../lib/session';
 // tidak pernah mepet atau tertutup navigasi sistem.
 // Label selalu terlihat: ikon saja tidak bisa dibaca staf yang baru pertama
 // kali memakai aplikasi.
+//
+// Warna diambil dari token tema, bukan hex yang ditulis di sini. Tab adalah
+// satu-satunya bagian navigasi yang bukan View Tailwind, jadi kalau warnanya
+// ditulis manual, tab tetap putih terang saat aplikasi sedang gelap.
 
-const WARNA_AKTIF = '#0071e3';
-const WARNA_NONAKTIF = '#8e8e93';
 const TINGGI_DASAR = 58;
 
 type NamaIkon = ComponentProps<typeof Ionicons>['name'];
@@ -48,6 +52,8 @@ function ikonTab(aktif: NamaIkon, nonaktif: NamaIkon) {
 export default function LayoutTab() {
   const { session, loading } = useSesi();
   const insets = useSafeAreaInsets();
+  const { dipakai } = useTema();
+  const { warna } = useWarna();
 
   if (!loading && !session) {
     return <Redirect href="/masuk" />;
@@ -57,16 +63,21 @@ export default function LayoutTab() {
   // yang melaporkan inset kosong), supaya tab tidak menempel ke tepi layar.
   const jarakBawah = Math.max(insets.bottom, Platform.OS === 'android' ? 10 : 0);
 
+  const gelap = dipakai === 'gelap';
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: WARNA_AKTIF,
-        tabBarInactiveTintColor: WARNA_NONAKTIF,
+        tabBarActiveTintColor: warna('bw-blue'),
+        tabBarInactiveTintColor: warna('bw-muted'),
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 0,
+          backgroundColor: warna('bw-card'),
+          // Di mode gelap bayangan tidak terlihat, jadi pemisah tipis di atas
+          // yang menggantikan bayangan supaya tab tidak menyatu dengan konten.
+          borderTopWidth: gelap ? StyleSheet.hairlineWidth : 0,
+          borderTopColor: warna('bw-line'),
           height: TINGGI_DASAR + jarakBawah,
           paddingTop: 8,
           paddingBottom: jarakBawah + 4,
@@ -74,10 +85,10 @@ export default function LayoutTab() {
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           // Bayangan lembut agar tab terpisah dari konten.
-          elevation: 12,
+          elevation: gelap ? 0 : 12,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.08,
+          shadowOpacity: gelap ? 0 : 0.08,
           shadowRadius: 10,
         },
         tabBarItemStyle: {

@@ -48,6 +48,23 @@ QR dengan Expo Go.
 | `npm run ascii` | Bersihkan karakter asing yang merusak build |
 | `npm run lint` | Lint |
 
+### Build APK
+
+`npx expo prebuild --platform android` hanya perlu sekali, atau setiap kali
+`app.json` berubah. Setelah itu build-nya:
+
+```bash
+cd android
+./gradlew.bat assembleRelease        # semua ABI, lambat
+./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a   # cepat
+```
+
+Baris kedua hanya menghasilkan APK untuk processor 64-bit. Itu cukup untuk
+sebagian besar ponsel sekarang dan build-nya turun dari tiga puluh menit lebih
+menjadi sekitar empat menit, karena Gradle mengulang compile native untuk tiap
+ABI. Pakai bentuk pertama untuk APK yang dibagikan ke staf, karena HP 32-bit
+tidak akan bisa memasang APK satu-ABI.
+
 ## Sumber warna ada satu
 
 Warna tidak ditulis ulang di sini. `scripts/generate-tema.mjs` membaca
@@ -123,6 +140,37 @@ Developer Program ($99/tahun) dan APNs key `.p8`. Keduanya opsional: kalau
 tidak diisi, notifikasi ke pengguna web tetap jalan dan hanya perangkat native
 yang tidak menerima.
 
+### Yang masih perlu diisi untuk push Android
+
+Jalankan `npm run push:siap` dari root untuk melihat daftar bagian yang kurang.
+Tidak ada yang boleh diisi asal-asalan; urutannya penting karena salah satu
+langkah bisa merusak build kalau dikerjakan sebelum prasyaratnya ada.
+
+1. Buat project di [Firebase console](https://console.firebase.google.com),
+   lalu daftarkan aplikasi Android dengan package persis
+   `id.bawaslu.bekasi.pengingat`. Salah ketik satu karakter membuat build
+   berhenti dengan pesan yang tidak menyebutkan push sama sekali.
+2. Unduh `google-services.json` dan simpan sebagai `mobile/google-services.json`
+3. Tambahkan ke `expo.android` di `mobile/app.json`:
+
+   ```json
+   "googleServicesFile": "./google-services.json"
+   ```
+
+   Jangan melakukan ini sebelum filenya ada, karena plugin Gradle akan gagal
+   dan build berhenti sebelum menghasilkan APK sama sekali.
+4. Di Firebase console, buat service account lalu generate private key.
+   Masukkan `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, dan `FCM_PRIVATE_KEY` ke
+   environment Vercel. Private key ditulis dengan `\n` untuk tiap baris baru
+5. Bangun ulang APK. APK lama tidak punya Firebase, jadi token tidak akan
+   pernah terbit
+6. Staf masuk lewat tab Akun. Baris di `device_tokens` muncul setelah itu
+7. Nyalakan notifikasi aplikasi di pengaturan sistem. Android 9 tidak
+   menampilkan dialog izin, jadi ini wajib dilakukan manual
+
+Langkah 2, 3, dan 5 tidak boleh urutannya dibalik. Yang paling sering gagal
+adalah langkah 3 dikerjakan lebih dulu.
+
 ## Batasan yang diketahui
 
 - **Ubah jadwal belum ada** di versi native. Tombolnya ada dan memberi
@@ -133,8 +181,12 @@ yang tidak menerima.
   beberapa sentimeter dan nama jadwal tidak pernah muat. Agenda menjawab
   pertanyaan yang sama dengan lebih cepat, dan navigasi tetap ada lewat
   pemilih tanggal bawaan sistem
-- **Belum pernah dijalankan di perangkat sungguhan.** Semuanya baru
-  diverifikasi lewat typecheck, unit test, dan bundling
+- **Push ke perangkat native belum aktif.** Aplikasi berjalan di perangkat
+  sungguhan (vivo, Android 9) dan pengingat lokal sudah terbukti berbunyi,
+  tetapi kiriman dari server belum bisa diuji sampai setup Firebase selesai.
+  Bagian `[Isi Google services.json]` menjelaskan apa yang masih perlu diisi
+
+## Batasan yang diketahui
 
 ## Struktur
 

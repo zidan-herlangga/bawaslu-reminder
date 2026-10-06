@@ -7,6 +7,7 @@
 
 import {
   AMBANG_TELAT_MS,
+  JENDELA_AWAL_MS,
   formatSelisih,
   kalimatPengingat,
   kandidatPengingat,
@@ -186,6 +187,88 @@ cek(
   'nilai negatif tidak jadi minus',
   formatSelisih(-60_000) === 'kurang dari satu menit'
 );
+
+console.log('\n11. penyaringan divisi');
+{
+  // Jadwal milik divisi sendiri harus lolos. Kalau ini gagal, staf tidak akan
+  // pernah melihat pengingat untuk pekerjaannya sendiri.
+  cek(
+    'divisi sendiri',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: 'Sosialisasi' })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      'Sosialisasi'
+    ).length === 1
+  );
+  cek(
+    'divisi lain ditapis',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: 'Sosialisasi' })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      'SosialisasiDanHukum'
+    ).length === 0
+  );
+  cek(
+    'tanpa target_divisi untuk semua orang',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: null })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      'SosialisasiDanHukum'
+    ).length === 1
+  );
+  cek(
+    'divisi belum diketahui tidak menyaring apa pun',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: 'Sosialisasi' })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      null
+    ).length === 1
+  );
+  cek(
+    'target_divisi spasi dihitung kosong',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: '   ' })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      'SosialisasiDanHukum'
+    ).length === 1
+  );
+  cek(
+    'target_divisi dengan spasi di sekitar tetap cocok',
+    kandidatPengingat(
+      [jadwal('a', T0 + menit(5), { target_divisi: ' Sosialisasi ' })],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      ' Sosialisasi '
+    ).length === 1
+  );
+  cek(
+    'penyaringan tidak mengganggu aturan lain',
+    kandidatPengingat(
+      [
+        jadwal('a', T0 + menit(5), { target_divisi: 'Sosialisasi' }),
+        jadwal('b', T0 + menit(5), { target_divisi: 'SosialisasiDanHukum' }),
+        jadwal('c', T0 + menit(5), { target_divisi: null }),
+        jadwal('d', T0 + menit(5), { status: 'Dibatalkan', target_divisi: null }),
+      ],
+      T0,
+      JENDELA_AWAL_MS,
+      AMBANG_TELAT_MS,
+      'Sosialisasi'
+    ).map((k) => k.jadwalId)
+      .join(',') === 'a,c'
+  );
+}
 
 console.log(`\nHASIL: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) process.exit(1);

@@ -16,7 +16,10 @@
     "test:e2e": "node scripts/e2e-notify.mjs",
     "push:cek": "node scripts/cek-push.mjs",
     "test:realtime": "node scripts/test-realtime.mjs",
-    "test:kolom": "node scripts/test-kolom.mjs"
+    "test:kolom": "node scripts/test-kolom.mjs",
+    "push:siap": "node scripts/cek-kesiapan-push.mjs",
+    "test:pengingat": "node --test scripts/test-pengingat-terjadwal.mjs",
+    "firebase:siap": "node scripts/setup-firebase.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

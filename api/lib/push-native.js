@@ -54,6 +54,19 @@ function base64url(input) {
     .replace(/=+$/, '');
 }
 
+// Channel Android dipilih per kategori, sama seperti nada per kategori yang
+// dibundel aplikasi (mobile/assets/sounds + res/raw). Kategori asing atau yang
+// tidak dikenal memakai channel bawaan 'pengingat-jadwal'.
+const KANAL_PER_KATEGORI = {
+  Rapat: 'pengingat-rapat',
+  Tugas: 'pengingat-tugas',
+  Pengawasan: 'pengingat-pengawasan',
+};
+
+function kanalAndroidUntuk(kategori) {
+  return KANAL_PER_KATEGORI[String(kategori ?? '').trim()] || 'pengingat-jadwal';
+}
+
 // ------------------------------------------------------------- Google FCM
 
 async function tokenGoogle() {
@@ -76,7 +89,7 @@ async function tokenGoogle() {
     })
   );
 
-  const penandatangan = createSign('RSA');
+  const penandatangan = createSign('RSA-SHA256');
   penandatangan.update(`${header}.${klaim}`);
   penandatangan.end();
   const tanda = penandatangan.sign(createPrivateKey(privateKey));
@@ -123,7 +136,7 @@ async function kirimFCM(tokenPerangkat, muatan) {
           android: {
             priority: 'high',
             notification: {
-              channelId: 'pengingat-jadwal',
+              channel_id: kanalAndroidUntuk(muatan.data?.kategori),
               // Tag membuat notifikasi kategori yang sama saling menggantikan,
               // bukan menumpuk di panel.
               tag: muatan.tag,
@@ -229,23 +242,23 @@ export async function kirimKeNative(daftarToken, muatan) {
     })
   );
 
-  hasilSemua.forEach((hasil, index) => {
+  hasilSemua.forEach((hasilSatuan, index) => {
     const baris = daftarToken[index];
 
-    if (hasil.status === 'rejected') {
+    if (hasilSatuan.status === 'rejected') {
       hasil.gagal += 1;
-      hasil.alasan.push(String(hasil.reason?.message ?? hasil.reason));
+      hasil.alasan.push(String(hasilSatuan.reason?.message ?? hasilSatuan.reason));
       return;
     }
 
-    if (hasil.value.ok) {
+    if (hasilSatuan.value.ok) {
       hasil.terkirim += 1;
       return;
     }
 
     hasil.gagal += 1;
-    hasil.alasan.push(hasil.value.alasan);
-    if (hasil.value.kedaluwarsa && baris?.token) {
+    hasil.alasan.push(hasilSatuan.value.alasan);
+    if (hasilSatuan.value.kedaluwarsa && baris?.token) {
       hasil.kedaluwarsa.push(baris.token);
     }
   });

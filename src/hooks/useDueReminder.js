@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NOTIFICATION_LEAD_MINUTES } from '../constants/options';
 import { playReminderSound } from '../lib/sound';
 import { notifyNow } from '../lib/push';
-import { supabase } from '../lib/supabase';
 import { getSlots, sortSlots } from '../lib/slots';
 
 const CHECK_INTERVAL_MS = 30 * 1000;
@@ -34,32 +33,21 @@ function isSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
-// Satu jalur pengumuman saja: pengingat disimpan ke tabel notifications, lalu
-// AppShell (realtime/polling) yang memutar suara dan menampilkan notifikasi
-// browser dengan isi persis seperti yang terlihat di lonceng. Kalau penyimpanan
-// ditolak (RLS belum dijalankan), baru diumumkan langsung sebagai cadangan.
-async function announce(schedule, noticeKey, body) {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id;
-    if (userId) {
-      const { error } = await supabase.from('notifications').insert({
-        jadwal_id: schedule.id,
-        pengirim_id: userId,
-        penerima_id: userId,
-        judul: 'Pengingat jadwal',
-        pesan: body,
-        target_divisi: schedule.target_divisi ?? null,
-      });
-
-      if (!error) return;
-      console.warn('[pengingat] gagal menyimpan pengingat ke lonceng:', error.message);
-    }
-  } catch (error) {
-    console.warn('[pengingat] gagal menyimpan pengingat ke lonceng:', error);
-  }
-
+// Pengingat untuk orang yang sedang membuka halaman.
+//
+// Baris lonceng TIDAK ditulis dari sini. Tabel notifications tidak punya
+// kebijakan INSERT untuk pengguna biasa, jadi percobaan itu selalu ditolak RLS
+// dan hanya menghasilkan satu warning di konsol. Selain itu pengingat ini hanya
+// untuk dirinya sendiri, jadi tidak akan pernah sampai ke staf lain.
+//
+// Yang menulis ke lonceng adalah api/pengingat-terjadwal.js, dijalankan cron
+// di server, dengan service role dan penerima yang dihitung ulang untuk semua
+// staf yang relevan. Jalur ini sekarang hanya jadi suara dan notifikasi
+// browser bagi tab yang sedang terbuka, supaya orang itu tahu seketika tanpa
+// perlu membuka aplikasi.
+function announce(schedule, noticeKey, body) {
   playReminderSound(schedule.kategori);
+
   if (isSupported() && Notification.permission === 'granted') {
     void notifyNow({ title: 'Pengingat jadwal', body, tag: noticeKey }).catch((error) =>
       console.warn('[pengingat] notifikasi lokal gagal:', error)
@@ -105,7 +93,7 @@ export default function useDueReminder(schedules, divisi) {
 
           const minutes = Math.max(1, Math.round(remaining / 60000));
           const body = `${schedule.judul} dimulai ${minutes} menit lagi.`;
-          void announce(schedule, noticeKey, body);
+          announce(schedule, noticeKey, body);
         });
       });
     };

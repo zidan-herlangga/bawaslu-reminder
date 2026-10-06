@@ -1,0 +1,41 @@
+# Tanpa berkas ini, Vercel mengunggah seluruh direktori kerja apa adanya.
+# Berkas pertama yang berisi isinya adalah mobile/android setelah prebuild:
+# direktori itu ratusan megabyte berisi hasil build Gradle, dan tidak ada satu
+# pun berkasnya yang dibutuhkan saat deployment di server.
+#
+# Yang dibutuhkan deployment hanya build web (src, public) dan serverless
+# functions di api/.
+
+# Dependensi. Vercel menginstal sendiri dari package-lock.json, dan mengunggah
+# node_modules hanya memperlambat upload tanpa mengubah hasil.
+node_modules
+mobile/node_modules
+
+# Hasil native. Direktori ini dihasilkan ulang oleh `expo prebuild --clean`
+# dan tidak pernah berada di dalam deployment server.
+mobile/android
+mobile/ios
+mobile/.expo
+
+# Berkas berisi rahasia atau identitas yang tidak boleh berada di server web.
+.env
+.env.*
+!.env.example
+google-services.json
+mobile/google-services.json
+
+# Hasil build web dan berkas log.
+dist
+dist-ios
+dist-web
+dist-ssr
+*.local
+logs
+*.log
+
+# Berkas proyek yang bersifat lokal atau otomatis.
+.git
+.vscode
+.idea
+.DS_Store
+downloads

@@ -334,10 +334,41 @@ alter table public.device_tokens enable row level security;
 -- Tidak ada policy select. Device tidak butuh membaca tokennya sendiri, dan
 -- menutup baca mencegah satu akun melihat token perangkat akun lain.
 
+-- Policy select ada karena PostgREST melakukan read-back setelah INSERT dan
+-- karena klausa "on conflict (token) do update" wajib membaca kolom token
+-- untuk mendeteksi konfliknya. Tanpa policy ini, seluruh upsert token
+-- perangkat ditolak Postgres dengan galat 42501 "new row violates row-level
+-- security policy", walau kebenaran policy insert dan update sudah benar.
+--
+-- Aksesnya dibatasi ke token milik sendiri, jadi staf tidak bisa membaca
+-- daftar token milik akun lain.
+drop policy if exists "select own device tokens" on public.device_tokens;
+create policy "select own device tokens"
+  on public.device_tokens for select
+  to authenticated
+  using (auth.uid() = user_id);
+
 drop policy if exists "insert own device tokens" on public.device_tokens;
 create policy "insert own device tokens"
   on public.device_tokens for insert
   to authenticated
+  with check (auth.uid() = user_id);
+
+-- Policy update ada supaya upsert berjalan sampai selesai.
+--
+-- Kode aplikasi memakai upsert dengan on_conflict=token, yang diterjemahkan
+-- Postgres menjadi "insert ... on conflict (token) do update". Untuk token
+-- baru jalur insert-nya jalan, tapi untuk token yang sudah ada jalur update
+-- dibuka oleh policy ini. Tanpa policy update, upsert pada token yang sudah
+-- ada berhenti sebagai galat, dan perangkat yang terpasang ulang atau masuk
+-- dengan akun yang sama tidak bisa menyegarkan barisnya.
+--
+-- Tanpa policy select disengaja: device tidak butuh membaca tokennya sendiri.
+drop policy if exists "update own device tokens" on public.device_tokens;
+create policy "update own device tokens"
+  on public.device_tokens for update
+  to authenticated
+  using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
 drop policy if exists "delete own device tokens" on public.device_tokens;

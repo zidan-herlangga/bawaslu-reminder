@@ -154,7 +154,6 @@ export const KODE_BUATAN = {
  * tidak memberi tahu apa yang harus dilakukan.
  */
 export function pesanGalatAuth(galat: unknown): string {
-  const kode = (galat as { code?: string } | null)?.code;
   const mentah =
     (galat as { message?: string } | null)?.message ??
     (typeof galat === 'string' ? galat : '');

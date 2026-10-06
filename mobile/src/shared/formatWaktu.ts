@@ -3,8 +3,20 @@
 // Port dari src/lib/formatWaktu.js. Versi ini memakai API Tanggal global,
 // yang tersedia penuh di Hermes, sehingga hasilnya sama persis dengan web.
 
+import { keTanggalLokal } from './tugas';
+
 function amanTanggal(nilai: string | number | Date | null | undefined): Date | null {
   if (nilai === null || nilai === undefined || nilai === '') return null;
+
+  if (typeof nilai === 'string') {
+    // Teks 'YYYY-MM-DD' dibaca Date sebagai tengah malam UTC, jadi di perangkat
+    // yang zona waktunya di belakang UTC tanggalnya tampil mundur sehari. Kolom
+    // date di Postgres selalu sampai seperti itu ke klien, jadi bentuk ini
+    // harus dibaca sebagai tengah malam waktu lokal.
+    const lokal = keTanggalLokal(nilai);
+    if (lokal) return lokal;
+  }
+
   const date = nilai instanceof Date ? nilai : new Date(nilai);
   return Number.isNaN(date.getTime()) ? null : date;
 }
