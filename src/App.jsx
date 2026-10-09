@@ -22,7 +22,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/kalender" element={<Kalender />} />
-        <Route path="/todo" element={<TodoPage />} />
+        <Route path="/tugas" element={<TodoPage />} />
         <Route path="/jadwal/baru" element={<ScheduleForm />} />
         <Route path="/jadwal/:id/edit" element={<ScheduleForm />} />
         <Route path="/akun" element={<Akun />} />

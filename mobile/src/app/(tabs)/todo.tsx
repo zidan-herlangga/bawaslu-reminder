@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -7,7 +7,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../../komponen/SafeAreaView';
+import { Button, ButtonText } from '../../components/ui/button';
+import { Card } from '../../components/ui/card';
+import { Input, InputField, InputSlot } from '../../components/ui/input';
 import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { LampuRealtime } from '../../komponen/LampuRealtime';
@@ -55,7 +58,6 @@ export default function LayarTugas() {
   const [teks, setTeks] = useState('');
   const [menambah, setMenambah] = useState(false);
   const [galat, setGalat] = useState('');
-  const [fokus, setFokus] = useState(false);
 
   // Daftar tugas punya tanggal, dan tanggal yang sedang dilihat bisa diubah
   // lewat tab. Sama seperti web, layar dibuka pada tab tanggal hari ini.
@@ -289,14 +291,28 @@ export default function LayarTugas() {
 
   // Semua angka di layar memakai daftar yang sedang terlihat, bukan seluruh
   // data. Kalau tidak, ringkasan progres akan menghitung tugas yang tidak
-  // terlihat dan langsung bertentangan dengan daftarnya.
-  const terlihat = visibleTugas(daftar, tab, tanggal);
-  const { belum, sudah, persen } = kelompokTugas(terlihat);
+  // terlihat dan langsung bertentangan dengan daftarnya. Di-memo supaya bagian
+  // ini tidak dihitung ulang tiap huruf yang diketik di kolom input.
+  const terlihat = useMemo(
+    () => visibleTugas(daftar, tab, tanggal),
+    [daftar, tab, tanggal]
+  );
+  const { belum, sudah, persen } = useMemo(
+    () => kelompokTugas(terlihat),
+    [terlihat]
+  );
   const bisaTambah = teks.trim().length > 0 && !menambah;
   const jumlahHariIni = tanggal === tanggalHariIni();
   // Kosong mencakup dua keadaan: belum punya tugas sama sekali, dan punya
   // tugas tapi tidak ada yang cocok dengan tanggal yang sedang dilihat.
   const kosong = !memuat && terlihat.length === 0 && !galat;
+
+  // Callback yang dipakai semua baris. Identitasnya stabil supaya BarisTugas
+  // yang di-memo tidak di-render ulang tiap ganti menit/ketikan.
+  const hapusTugas = useCallback((todo: Todo) => {
+    setHapusTarget(todo);
+  }, []);
+  const tidakApa = useCallback(() => {}, []);
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
@@ -344,7 +360,7 @@ export default function LayarTugas() {
 
         {/* Ringkasan progres */}
         {terlihat.length > 0 ? (
-          <View className="mt-5 rounded-[28px] border border-bw-line bg-bw-card p-5">
+          <Card size="sm" className="mt-5 overflow-hidden rounded-[28px] border-bw-line bg-bw-card p-5 gap-0">
             <View className="flex-row items-end justify-between">
               <View className="flex-1">
                 <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
@@ -369,37 +385,37 @@ export default function LayarTugas() {
                 style={{ width: `${persen}%` }}
               />
             </View>
-          </View>
+          </Card>
         ) : null}
 
         {/* Input tugas baru */}
         <View className="mt-5 flex-row gap-2.5">
-          <View
-            className={`h-14 flex-1 flex-row items-center gap-2 rounded-2xl border-2 bg-bw-card px-4 ${
-              fokus ? 'border-bw-blue' : 'border-bw-line'
-            }`}
+          <Input
+            className="h-14 flex-1 border-2 border-bw-line bg-bw-card px-4 data-[focus=true]:border-bw-blue data-[focus=true]:web:ring-0"
           >
-            <Ikon nama="create-outline" token="bw-muted" ukuran={18} />
-            <TextInput
+            <InputSlot>
+              <Ikon nama="create-outline" token="bw-muted" ukuran={18} />
+            </InputSlot>
+            <InputField
               value={teks}
               onChangeText={setTeks}
-              onFocus={() => setFokus(true)}
-              onBlur={() => setFokus(false)}
               placeholder="Tulis tugas baru..."
               placeholderTextColor="#9a9aa0"
               accessibilityLabel="Tulis tugas baru"
               onSubmitEditing={tambah}
               returnKeyType="done"
               className="flex-1 text-base text-bw-ink"
+              inputMode="text"
             />
-          </View>
-          <Pressable
-            accessibilityRole="button"
+          </Input>
+          <Button
             accessibilityLabel="Tambah tugas"
             onPress={tambah}
-            disabled={!bisaTambah}
-            className={`h-14 w-14 items-center justify-center rounded-2xl active:opacity-80 ${
-              bisaTambah ? 'bg-bw-blue' : 'bg-bw-line'
+            isDisabled={!bisaTambah}
+            className={`h-14 w-14 flex-row items-center justify-center rounded-2xl ${
+              bisaTambah
+                ? 'bg-bw-blue data-[hover=true]:bg-bw-blue-hi data-[active=true]:bg-bw-blue-hi'
+                : 'bg-bw-line data-[hover=true]:bg-bw-line'
             }`}
           >
             <Ikon
@@ -407,14 +423,15 @@ export default function LayarTugas() {
               ukuran={26}
               token={bisaTambah ? 'bw-blue-50' : 'bw-muted'}
             />
-          </Pressable>
+          </Button>
         </View>
 
         {/* Galat */}
         {galat ? (
-          <View
+          <Card
+            size="sm"
             accessibilityRole="alert"
-            className="mt-5 rounded-3xl border border-bw-red-100 bg-bw-red-50 p-4"
+            className="mt-5 overflow-hidden rounded-3xl border-bw-red-100 bg-bw-red-50 p-4 gap-0"
           >
             <View className="flex-row items-center gap-2">
               <Ikon nama="alert-circle-outline" token="bw-red" ukuran={18} />
@@ -423,14 +440,14 @@ export default function LayarTugas() {
               </Text>
             </View>
             <Text className="mt-1.5 text-xs leading-relaxed text-bw-red">{galat}</Text>
-            <Pressable
+            <Button
               onPress={muat}
-              accessibilityRole="button"
-              className="mt-3 h-12 items-center justify-center rounded-2xl bg-bw-red-solid active:opacity-80"
+              accessibilityLabel="Coba lagi muat tugas"
+              className="mt-3 h-12 rounded-2xl bg-bw-red-solid data-[hover=true]:bg-bw-red data-[active=true]:bg-bw-red"
             >
-              <Text className="text-sm font-bold text-white">Coba lagi</Text>
-            </Pressable>
-          </View>
+              <ButtonText className="text-sm font-bold text-white">Coba lagi</ButtonText>
+            </Button>
+          </Card>
         ) : null}
 
         {/* Memuat */}
@@ -440,7 +457,10 @@ export default function LayarTugas() {
 
         {/* Kosong */}
         {kosong ? (
-          <View className="mt-8 items-center rounded-[28px] border border-dashed border-bw-line bg-bw-card px-6 py-12">
+          <Card
+            size="sm"
+            className="mt-8 items-center overflow-hidden rounded-[28px] border-dashed border-bw-line bg-bw-card px-6 py-12 gap-0"
+          >
             <View className="h-16 w-16 items-center justify-center rounded-full bg-bw-surface">
               <Ikon
                 nama={jumlahHariIni ? 'calendar-outline' : 'checkmark-done-outline'}
@@ -458,7 +478,7 @@ export default function LayarTugas() {
                   : `Belum ada tugas pada ${formatTanggalPanjang(tanggal)}.`
                 : 'Daftar tugas masih kosong.'}
             </Text>
-          </View>
+          </Card>
         ) : null}
 
         {/* Belum selesai */}
@@ -475,12 +495,12 @@ export default function LayarTugas() {
                   tampilkanTanggal={tab === 'semua'}
                   onAlih={alihkan}
                   sedangEdit={editId === todo.id}
-                  draf={editDraf}
+                  draf={editId === todo.id ? editDraf : ''}
                   onUbahDraf={setEditDraf}
                   onMulaiEdit={mulaiEdit}
                   onBatalEdit={batalEdit}
-                  onSimpanEdit={simpanEdit}
-                  onHapus={() => setHapusTarget(todo)}
+                  onSimpanEdit={editId === todo.id ? simpanEdit : tidakApa}
+                  onHapus={hapusTugas}
                 />
               ))}
             </View>
@@ -501,12 +521,12 @@ export default function LayarTugas() {
                   tampilkanTanggal={tab === 'semua'}
                   onAlih={alihkan}
                   sedangEdit={editId === todo.id}
-                  draf={editDraf}
+                  draf={editId === todo.id ? editDraf : ''}
                   onUbahDraf={setEditDraf}
                   onMulaiEdit={mulaiEdit}
                   onBatalEdit={batalEdit}
-                  onSimpanEdit={simpanEdit}
-                  onHapus={() => setHapusTarget(todo)}
+                  onSimpanEdit={editId === todo.id ? simpanEdit : tidakApa}
+                  onHapus={hapusTugas}
                 />
               ))}
             </View>
@@ -530,7 +550,9 @@ export default function LayarTugas() {
   );
 }
 
-function BarisTugas({
+// Baris tugas di-memo: pada layar yang me-render ulang tiap huruf diketik,
+// baris yang tidak berubah tidak perlu membangun kembali pohonnya lagi.
+const BarisTugas = memo(function BarisTugas({
   todo,
   tampilkanTanggal,
   onAlih,
@@ -551,7 +573,7 @@ function BarisTugas({
   onMulaiEdit: (todo: Todo) => void;
   onBatalEdit: () => void;
   onSimpanEdit: () => void;
-  onHapus: () => void;
+  onHapus: (todo: Todo) => void;
 }) {
   const [menuTerbuka, setMenuTerbuka] = useState(false);
 
@@ -560,7 +582,10 @@ function BarisTugas({
   // orang, teksnya pendek, dan tidak ada yang perlu diisi selain teks.
   if (sedangEdit) {
     return (
-      <View className="rounded-3xl border border-bw-blue bg-bw-card p-3.5">
+      <Card
+        size="sm"
+        className="flex-col overflow-hidden rounded-3xl border-bw-blue bg-bw-card p-3.5 gap-0"
+      >
         <TextInput
           value={draf}
           onChangeText={onUbahDraf}
@@ -588,13 +613,14 @@ function BarisTugas({
             teksPutih
           />
         </View>
-      </View>
+      </Card>
     );
   }
 
   return (
-    <View
-      className={`min-h-16 flex-row items-center gap-3.5 rounded-3xl border border-bw-line bg-bw-card px-4 py-3.5 ${
+    <Card
+      size="sm"
+      className={`min-h-16 flex-row items-center gap-3.5 overflow-hidden rounded-3xl border-bw-line bg-bw-card px-4 py-3.5 gap-0 ${
         todo.selesai ? 'opacity-70' : ''
       }`}
     >
@@ -657,7 +683,7 @@ function BarisTugas({
             ikon="trash-outline"
             onPress={() => {
               setMenuTerbuka(false);
-              onHapus();
+              onHapus(todo);
             }}
             className="border border-bw-red-100 bg-bw-red-50"
           />
@@ -673,9 +699,9 @@ function BarisTugas({
           <Ikon nama="ellipsis-horizontal" token="bw-muted" ukuran={20} />
         </Pressable>
       )}
-    </View>
+    </Card>
   );
-}
+});
 
 function TombolAksi({
   label,

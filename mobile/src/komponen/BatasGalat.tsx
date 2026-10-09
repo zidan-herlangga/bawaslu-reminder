@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import {
   Appearance,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from './SafeAreaView';
 
 // Penangkap galat untuk seluruh aplikasi.
 //
@@ -45,7 +45,7 @@ const WARNA = {
     teks: '#1d1d1f',
     redup: '#6b6b70',
     teksKedua: '#3a3a3c',
-    biru: '#0071e3',
+    biru: '#E02401',
     merah: '#d92d20',
     merahMuda: '#fee4e2',
   },
@@ -56,7 +56,7 @@ const WARNA = {
     teks: '#f5f5f7',
     redup: '#98989d',
     teksKedua: '#d1d1d6',
-    biru: '#2997ff',
+    biru: '#FF6B4A',
     merah: '#ff6961',
     merahMuda: '#3b1a18',
   },

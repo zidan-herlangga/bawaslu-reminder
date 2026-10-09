@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+﻿import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../komponen/SafeAreaView';
 import { BidangAuth, KotakPesan } from '../komponen/BidangAuth';
 import { Ikon } from '../komponen/Ikon';
 import { useSesi } from '../lib/session';
@@ -101,7 +101,7 @@ export default function LayarAturUlangSandi() {
   if (keadaan === 'memeriksa') {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-bw-canvas" edges={['top', 'bottom']}>
-        <ActivityIndicator size="large" color="#0071e3" />
+        <ActivityIndicator size="large" color="#E02401" />
         <Text className="mt-4 text-sm text-bw-muted">Memeriksa tautan...</Text>
       </SafeAreaView>
     );

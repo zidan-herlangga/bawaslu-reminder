@@ -45,7 +45,7 @@ function warnaiMeta(mode) {
   // Warna bilah status di Android dan PWA harus ikut mode efektif, bukan
   // setelan sistem, supaya tema gelap tidak menampilkan batu putih yang
   // menyilaukan di layar gelap.
-  const warna = mode === 'gelap' ? '#08080a' : '#f2f2f7';
+  const warna = mode === 'gelap' ? '#0e0c0a' : '#faf7f3';
 
   document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
     meta.removeAttribute('media');

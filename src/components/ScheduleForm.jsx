@@ -407,7 +407,7 @@ export default function ScheduleForm() {
               aria-describedby={errors.judul ? 'judul-error' : undefined}
               className={`${FIELD_BASE_CLASS} ${
                 errors.judul ? FIELD_INVALID_CLASS : FIELD_OK_CLASS
-              }`}
+              } m`}
             />
             <FieldError id="judul-error">{errors.judul}</FieldError>
           </div>

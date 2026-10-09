@@ -27,6 +27,7 @@ export interface NilaiSesi {
   daftar: (nilai: NilaiPendaftaranTanpaSandi) => Promise<HasilDaftar>;
   kirimTautanAturUlang: (email: string) => Promise<void>;
   aturSandiBaru: (sandi: string) => Promise<void>;
+  ubahSandi: (sandiLama: string, sandiBaru: string) => Promise<void>;
   keluar: () => Promise<void>;
   /** Pesan galat terakhir, dibersihkan setelah dibaca. */
   galat: string;
@@ -254,16 +255,23 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
   /**
    * Meminta Supabase mengirim tautan atur ulang kata sandi.
    *
-   * redirectTo memakai skema aplikasi, bukan alamat web, supaya tautannya
-   * membuka aplikasi ini di perangkat. Skemanya diambil dari app.json:
-   * bawaslu-jadwal, dari app.json. authorities=reset-password menunjuk route
-   * menerima tautan itu.
+   * redirectTo menunjuk halaman web, bukan skema aplikasi: tautan di email
+   * harus dibuka di peramban tempat orang mengetik kata sandi barunya, bukan
+   * dilempar ke aplikasi. Alamatnya diambil dari EXPO_PUBLIC_API_ORIGIN
+   * (situs yang sama dengan yang dipakai api.ts), jadi tidak ada URL produksi
+   * yang ditulis mati di kode.
+   *
+   * Skema aplikasi tetap dipakai sebagai cadangan kalau variabel itu kosong,
+   * supaya tautan tetap punya tujuan walau konfigurasi .env belum lengkap.
+   * Satu hal yang tidak bisa dikerjakan dari sisi kode: Supabase hanya
+   * menerima redirectTo yang terdaftar di Authentication > URL Configuration.
    */
   const kirimTautanAturUlang = useCallback(async (email: string) => {
     setGalat('');
 
+    const asal = process.env.EXPO_PUBLIC_API_ORIGIN?.trim().replace(/\/+$/, '');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: Linking.createURL('reset-password'),
+      redirectTo: asal ? `${asal}/reset-password` : Linking.createURL('reset-password'),
     });
 
     if (error) {
@@ -285,6 +293,61 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   }, []);
+
+  /**
+   * Mengubah kata sandi dari dalam aplikasi, dengan verifikasi sandi lama.
+   *
+   * Supabase tidak punya endpoint khusus untuk memeriksa sandi lama, jadi
+   * caranya adalah masuk ulang dengan sandi lama lebih dulu. Keberhasilan
+   * masuk membuktikan sandi lama benar; kalau gagal, galat dilempar sebelum
+   * updateUser sempat dipanggil, sehingga sandi baru tidak pernah tersimpan
+   * tanpa verifikasi.
+   *
+   * signInWithPassword menggantikan sesi dengan sesi baru untuk akun yang
+   * sama, jadi pengguna tetap masuk setelah perubahan dan tidak perlu
+   * masuk ulang.
+   */
+  const ubahSandi = useCallback(
+    async (sandiLama: string, sandiBaru: string) => {
+      setGalat('');
+
+      const email = session?.user?.email;
+      if (!email) {
+        throw new Error('Sesi tidak ditemukan. Masuk ulang lalu coba lagi.');
+      }
+
+      const { error: galatMasuk } = await supabase.auth.signInWithPassword({
+        email,
+        password: sandiLama,
+      });
+
+      if (galatMasuk) {
+        const pesan = galatMasuk.message.toLowerCase();
+        const kode = (galatMasuk as { code?: string }).code;
+
+        // Dalam konteks ini yang diisi hanya sandi, bukan email, jadi pesan
+        // "Email atau kata sandi tidak cocok" akan menyesatkan.
+        if (kode === 'invalid_credentials' || pesan.includes('invalid login credentials')) {
+          const galatSandi = new Error('Kata sandi saat ini tidak sesuai.');
+          setGalat(galatSandi.message);
+          throw galatSandi;
+        }
+
+        setGalat(pesanGalatAuth(galatMasuk));
+        throw galatMasuk;
+      }
+
+      const { error: galatUbah } = await supabase.auth.updateUser({
+        password: sandiBaru,
+      });
+
+      if (galatUbah) {
+        setGalat(pesanGalatAuth(galatUbah));
+        throw galatUbah;
+      }
+    },
+    [session?.user?.email]
+  );
 
   const keluar = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
@@ -312,11 +375,12 @@ export function SesiProvider({ children }: { children: React.ReactNode }) {
       keluar,
       kirimTautanAturUlang,
       aturSandiBaru,
+      ubahSandi,
       galat,
       hapusGalat,
       divisi,
     }),
-    [session, loading, masuk, daftar, keluar, kirimTautanAturUlang, aturSandiBaru, galat, hapusGalat, divisi]
+    [session, loading, masuk, daftar, keluar, kirimTautanAturUlang, aturSandiBaru, ubahSandi, galat, hapusGalat, divisi]
   );
 
   return <KonteksSesi.Provider value={nilai}>{children}</KonteksSesi.Provider>;

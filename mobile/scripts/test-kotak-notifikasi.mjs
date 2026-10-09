@@ -14,6 +14,7 @@ import {
   reducerKotak,
   tandaiSemuaDibaca,
   tandaiDibaca,
+  hapusSemuaDariDaftar,
 } from '../src/shared/kotakNotifikasi.ts';
 
 let lulus = 0;
@@ -143,6 +144,31 @@ console.log('\n5. notifikasi baru');
     notifikasiBaru(sekarang, new Set(['baru', 'lama']), false).length === 0
   );
   cek('daftar kosong tidak ada yang baru', notifikasiBaru([], new Set(), false).length === 0);
+
+  // Baris lama yang baru ikut masuk jendela 30 teratas - misalnya karena baris
+  // di atasnya dihapus - dibuat sebelum maksimum yang pernah dilihat. Menganggapnya
+  // baru akan membunyikan suara pengingat untuk kabar lama.
+  const berwaktu = [
+    { id: 'naik', judul: '', pesan: '', dibaca: false, dibuatPada: '2026-03-10T08:00:00.000Z', jadwalId: null, kategori: null },
+  ];
+  cek(
+    'baris lebih lama dari maksimum tidak dianggap baru',
+    notifikasiBaru(berwaktu, new Set(), false, Date.parse('2026-03-11T00:00:00.000Z')).length === 0
+  );
+  cek(
+    'baris lebih baru dari maksimum dianggap baru',
+    notifikasiBaru(berwaktu, new Set(), false, Date.parse('2026-03-09T00:00:00.000Z')).length === 1
+  );
+  cek(
+    'baris dengan waktu kosong tidak dianggap baru saat patokan ada',
+    notifikasiBaru(berwaktu.map((item) => ({ ...item, dibuatPada: '' })), new Set(), false, 1).length === 0
+  );
+  // Tanpa patokan waktu, perilaku lama berlaku: id yang belum pernah dilihat
+  // dianggap baru (kompatibilitas dengan pemanggil yang tidak tahu waktu).
+  cek(
+    'tanpa patokan waktu tetap memakai perilaku lama',
+    notifikasiBaru(berwaktu, new Set(), false).length === 1
+  );
 }
 
 console.log('\n6. batas jumlah kotak masuk');
@@ -150,6 +176,10 @@ console.log('\n6. batas jumlah kotak masuk');
   // Web memakai 30. Kalau mobile memakai angka lain, kedua sisi akan menampilkan
   // isi yang berbeda untuk akun yang sama.
   cek('batas 30 sama dengan web', MAKS_KOTAK_MASUK === 30);
+
+  const isi = [{ id: 'a', judul: '', pesan: '', dibaca: false, dibuatPada: '', jadwalId: null, kategori: null }];
+  cek('hapus semua mengembalikan daftar kosong', hapusSemuaDariDaftar(isi).length === 0);
+  cek('hapus semua tidak mengubah daftar asli', isi.length === 1);
 }
 
 console.log('\n7. reducer: muat dan ganti');
@@ -205,6 +235,26 @@ console.log('\n8. reducer: tandai dan gulung balik');
 
   const semuaUDA = reducerKotak(semua, { jenis: 'tandaiSemua', userId: U });
   cek('tandai semua saat semuanya sudah dibaca tidak berubah', semuaUDA === semua);
+
+  // Penghapusan seluruh kotak masuk: tampil kosong dulu, snapshot disimpan
+  // untuk pengembalian kalau database menolak.
+  const berisi = reducerKotak(kotakAwal(), { jenis: 'muat', userId: U, daftar: baris });
+  const dikosongkan = reducerKotak(berisi, { jenis: 'hapusSemua', userId: U });
+  cek('hapus semua mengosongkan daftar', dikosongkan.daftar.length === 0);
+  cek('hapus semua menyimpan snapshot', dikosongkan.gulungBalik !== null);
+  cek(
+    'hapus semua tidak mengubah daftar asli',
+    berisi.daftar.length === 2
+  );
+  const kembaliSemua = gulungBalikKotak(dikosongkan);
+  cek('gulung balik mengembalikan daftar', kembaliSemua.daftar.length === 2);
+  cek('gulung balik membuang snapshot', kembaliSemua.gulungBalik === null);
+
+  const sudahKosong = reducerKotak(kotakAwal(), { jenis: 'muat', userId: U, daftar: [] });
+  cek(
+    'hapus semua saat kosong tidak mengubah apa pun',
+    reducerKotak(sudahKosong, { jenis: 'hapusSemua', userId: U }) === sudahKosong
+  );
 }
 
 console.log('\n9. reducer: pergantian staf');

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+﻿import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from './SafeAreaView';
 import { BarisSlot, type BidangSlot } from './BarisSlot';
 import { Ikon } from './Ikon';
 import { beriTahuStaf } from '../lib/kabarStaf';

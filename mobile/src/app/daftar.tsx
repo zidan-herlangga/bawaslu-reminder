@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+﻿import { Redirect, router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../komponen/SafeAreaView';
 import { BidangAuth, KotakPesan } from '../komponen/BidangAuth';
 import { Ikon } from '../komponen/Ikon';
 import { useSesi } from '../lib/session';
@@ -152,7 +152,7 @@ export default function LayarDaftar() {
                 label="Nama lengkap"
                 nilai={nilai.namaLengkap}
                 onUbah={(v) => ubah('namaLengkap', v)}
-                placeholder="Nama lengkap sesuai KTP"
+                placeholder="Nama lengkap"
                 autoComplete="name"
                 returnKeyType="next"
               />
@@ -163,7 +163,7 @@ export default function LayarDaftar() {
                   nilai={nilai.email}
                   onUbah={(v) => ubah('email', v)}
                   jenis="email"
-                  placeholder="nama@bawaslu.go.id"
+                  placeholder="Masukkan email yang ingin didaftarkan"
                   autoComplete="email"
                   keyboardType="email-address"
                   returnKeyType="next"

@@ -30,12 +30,15 @@ export default function ClockWidget() {
         </span>
       </div>
 
+      {/* AM and PM */}
+      
       <div className="mt-2 flex items-baseline gap-1">
         <span className="font-display text-[36px] font-bold leading-none tracking-tight tabular-nums">
           {pad(now.getHours())}:{pad(now.getMinutes())}
+          :{pad(now.getSeconds())}
         </span>
         <span className="font-display text-lg font-semibold leading-none tabular-nums text-white/70">
-          :{pad(now.getSeconds())}
+          {now.getHours() < 12 ? 'AM' : 'PM'}
         </span>
       </div>
 

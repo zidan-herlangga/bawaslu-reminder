@@ -12,6 +12,7 @@ import {
   tanggalDariDate,
   tanggalHariIni,
 } from '../shared/tugas';
+import { useTema } from '../tema/TemaProvider';
 
 // Pemilih tanggal untuk daftar tugas.
 //
@@ -34,6 +35,7 @@ export function PilihTanggal({
 }) {
   const [terbuka, setTerbuka] = useState(false);
   const diIos = Platform.OS === 'ios';
+  const { dipakai } = useTema();
 
   // Nilai picker harus berupa Date. Kalau teks tanggalnya rusak, pakai hari ini
   // supaya picker tetap terbuka di tanggal yang masuk akal.
@@ -102,7 +104,8 @@ export function PilihTanggal({
               display="spinner"
               locale="id-ID"
               onChange={terapkan}
-              accentColor="#0071e3"
+              accentColor="#E02401"
+              themeVariant={dipakai === 'gelap' ? 'dark' : 'light'}
             />
             <Pressable
               accessibilityRole="button"

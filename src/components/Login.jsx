@@ -113,7 +113,7 @@ export default function Login() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
-                placeholder="nama@contoh.go.id"
+                placeholder="Masukkan email yang terdaftar"
                 className={INPUT_CLASS}
               />
             </div>

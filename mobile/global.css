@@ -1,3 +1,65 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+@theme {
+  --color-bw-blue: #E02401;
+  --color-bw-blue-hi: #BC1E01;
+  --color-bw-blue-50: #FCE9E6;
+  --color-bw-blue-100: #F7C8C0;
+  --color-bw-blue-200: #F09280;
+  --color-bw-blue-700: #921701;
+  --color-bw-blue-900: #550E00;
+
+  --color-bw-red: #D0342C;
+  --color-bw-red-50: #FCEBEA;
+  --color-bw-red-100: #F7D2D0;
+  --color-bw-red-solid: #B3271F;
+
+  --color-bw-amber: #EBA83A;
+  --color-bw-amber-50: #FDF6EB;
+  --color-bw-amber-200: #F6D8A6;
+  --color-bw-amber-500: #C18A30;
+  --color-bw-amber-800: #815C20;
+  --color-bw-amber-900: #594016;
+
+  --color-bw-green: #15803D;
+  --color-bw-green-50: #EAF7EF;
+  --color-bw-green-200: #C0E6D0;
+  --color-bw-green-500: #22A55B;
+  --color-bw-green-700: #166534;
+
+  --color-bw-ink: #1E1B18;
+  --color-bw-ink-2: #3A3530;
+  --color-bw-muted: #756F66;
+  --color-bw-line: #EAE4DB;
+  --color-bw-surface: #F6F1EA;
+  --color-bw-canvas: #FAF7F3;
+  --color-bw-card: #FFFFFF;
+  --color-bw-solid: #221F1B;
+  --color-bw-solid-text: #FAF7F3;
+  --color-bw-solid-muted: #D6CDBF;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -18px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.05), 0 20px 44px -22px rgba(0, 0, 0, 0.3);
+
+  --color-primary: #171717;
+  --color-primary-foreground: #FAFAFA;
+  --color-secondary: #F5F5F5;
+  --color-secondary-foreground: #171717;
+  --color-background: #FFFFFF;
+  --color-foreground: #0A0A0A;
+  --color-card: #FFFFFF;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #0A0A0A;
+  --color-muted: #F5F5F5;
+  --color-muted-foreground: #737373;
+  --color-destructive: #E7000B;
+  --color-border: #E5E5E5;
+  --color-input: #E5E5E5;
+  --color-ring: #D4D4D4;
+  --color-accent: #F7F7F7;
+  --color-accent-foreground: #343434;
+}

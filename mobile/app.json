@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "primaryColor": "#0071e3",
+    "primaryColor": "#E02401",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "id.bawaslu.bekasi.pengingat",
@@ -57,7 +57,7 @@
       [
         "expo-notifications",
         {
-          "color": "#0071e3",
+          "color": "#E02401",
           "defaultChannel": "pengingat-jadwal",
           "icon": "./assets/notification-icon.png",
           "sounds": [
@@ -69,7 +69,26 @@
         }
       ],
       "expo-calendar",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "hidden": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 128,
+          "resizeMode": "contain",
+          "backgroundColor": "#FAF7F3",
+          "dark": {
+            "backgroundColor": "#0E0C0A"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

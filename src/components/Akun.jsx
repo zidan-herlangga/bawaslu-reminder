@@ -23,7 +23,7 @@ import {
 // Kalender supaya pengguna langsung tahu kategori yang mana tanpa membaca.
 const KATEGORI_TONE = {
   Rapat: { dot: 'bg-bw-blue', chip: 'border-bw-blue-200 bg-bw-blue-50 text-bw-blue-700' },
-  Tugas: { dot: 'bg-bw-amber-500', chip: 'border-bw-amber-200 bg-bw-amber-50 text-bw-amber' },
+  Tugas: { dot: 'bg-bw-amber-500', chip: 'border-bw-amber-200 bg-bw-amber-50 text-bw-amber-800' },
   Pengawasan: {
     dot: 'bg-bw-green-500',
     chip: 'border-bw-green-200 bg-bw-green-50 text-bw-green-700',

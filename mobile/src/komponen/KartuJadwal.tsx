@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { Card } from '../components/ui/card';
 import { formatJam, formatSisa } from '../shared/formatWaktu';
 import { namaDivisi } from '../shared/options';
 import {
@@ -86,8 +87,9 @@ export function KartuJadwal({
   }
 
   return (
-    <View
-      className={`overflow-hidden rounded-[28px] border border-bw-line bg-bw-card shadow-card ${
+    <Card
+      size="sm"
+      className={`overflow-hidden rounded-[28px] border-bw-line bg-bw-card shadow-card p-0 gap-0 ${
         lewat ? 'opacity-70' : ''
       }`}
     >
@@ -216,7 +218,7 @@ export function KartuJadwal({
           </View>
         ) : null}
       </View>
-    </View>
+    </Card>
   );
 }
 

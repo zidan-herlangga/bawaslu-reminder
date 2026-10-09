@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../../komponen/SafeAreaView';
+import { Button, ButtonText } from '../../components/ui/button';
+import { Card } from '../../components/ui/card';
 import { Ikon } from '../../komponen/Ikon';
 import { Lencana, LencanaSelesai } from '../../komponen/Lencana';
 import { LampuRealtime } from '../../komponen/LampuRealtime';
 import { useSesi } from '../../lib/session';
 import { useJadwal } from '../../lib/useJadwal';
 import { formatJam, formatTanggalPanjang } from '../../shared/formatWaktu';
+import { dapatkanHariLibur, type HariLibur } from '../../shared/hariLibur';
 import {
   sesiSelesai,
   slotDayKey,
@@ -72,10 +75,16 @@ export default function LayarAgenda() {
   const [terpilih, setTerpilih] = useState(() => new Date());
   const [bulanTampil, setBulanTampil] = useState(() => awalBulan(new Date()));
   const [kalenderTerbuka, setKalenderTerbuka] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 60000) * 60000);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), KELIP_MS);
+    // Dibulatkan ke menit: waktu tampil presisi menit, jadi setNow yang sama
+    // dalam satu menit dibatalkan React (nilainya sama) dan hanya menit baru
+    // yang me-render.
+    const timer = setInterval(
+      () => setNow(Math.floor(Date.now() / 60000) * 60000),
+      KELIP_MS
+    );
     return () => clearInterval(timer);
   }, []);
 
@@ -106,7 +115,26 @@ export default function LayarAgenda() {
     return peta;
   }, [jadwal]);
 
-  const baris = useMemo(() => {
+  // Daftar hari libur per tanggal dalam bulan yang ditampilkan. Dikelompokkan
+  // sekali per bulan, bukan difilter ulang untuk tiap sel pada tiap render.
+  const liburPerKunci = useMemo(() => {
+    const peta = new Map<string, HariLibur[]>();
+    const semua = dapatkanHariLibur(
+      bulanTampil.getFullYear(),
+      bulanTampil.getMonth()
+    );
+    for (const libur of semua) {
+      const daftar = peta.get(libur.tanggal) ?? [];
+      daftar.push(libur);
+      peta.set(libur.tanggal, daftar);
+    }
+    return peta;
+  }, [bulanTampil]);
+
+  // Baris mentah (belum diurutkan): referensi objek sesi/agenda stabil selagi
+  // data tidak berubah, jadi BarisAgenda yang di-memo bisa melewati re-render
+  // yang tidak perlu (misalnya saat jam berdetak).
+  const barisDasar = useMemo(() => {
     const hasil: Baris[] = [];
 
     for (const item of jadwal) {
@@ -129,9 +157,13 @@ export default function LayarAgenda() {
       }
     }
 
+    return hasil;
+  }, [jadwal, kunciTerpilih]);
+
+  const baris = useMemo(() => {
     // Sesi yang sudah lewat diturunkan ke bawah, terbaru lebih dulu di dalam
     // kelompoknya. Aturan yang sama dipakai kartu di Beranda.
-    return hasil.sort((a, b) => {
+    return barisDasar.slice().sort((a, b) => {
       const lewatA = sesiSelesai(a.sesi, now);
       const lewatB = sesiSelesai(b.sesi, now);
       if (lewatA !== lewatB) return lewatA ? 1 : -1;
@@ -140,7 +172,7 @@ export default function LayarAgenda() {
       const mulaiB = new Date(b.sesi.mulai).getTime();
       return lewatA ? mulaiB - mulaiA : mulaiA - mulaiB;
     });
-  }, [jadwal, kunciTerpilih, now]);
+  }, [barisDasar, now]);
 
   const geserHari = useCallback((nilai: number) => {
     setTerpilih((sebelumnya) => {
@@ -164,6 +196,8 @@ export default function LayarAgenda() {
   }, [sel]);
 
   const sudahHariIni = kunciTerpilih === hariIni;
+  const liburTerpilih = liburPerKunci.get(kunciTerpilih) ?? [];
+  const lakukanTidakAda = useCallback(() => {}, []);
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
@@ -184,29 +218,30 @@ export default function LayarAgenda() {
             <LampuRealtime terhubung={terhubung} />
           </View>
 
-          <Pressable
+          <Button
+            variant="outline"
+            size="lg"
             onPress={() => setTerpilih(new Date())}
-            accessibilityRole="button"
             accessibilityLabel="Kembali ke hari ini"
-            disabled={sudahHariIni}
-            className={`h-11 justify-center rounded-full border px-4 active:opacity-70 ${
+            isDisabled={sudahHariIni}
+            className={`h-11 justify-center rounded-full border px-4 ${
               sudahHariIni
-                ? 'border-bw-line bg-bw-card opacity-50'
-                : 'border-bw-blue bg-bw-blue-50'
+                ? 'border-bw-line bg-bw-card data-[disabled=true]:opacity-50'
+                : 'border-bw-blue bg-bw-blue-50 data-[hover=true]:bg-bw-blue-100 data-[active=true]:bg-bw-blue-100'
             }`}
           >
-            <Text
+            <ButtonText
               className={`text-xs font-bold ${
                 sudahHariIni ? 'text-bw-ink-2' : 'text-bw-blue-700'
               }`}
             >
               Hari ini
-            </Text>
-          </Pressable>
+            </ButtonText>
+          </Button>
         </View>
 
         {/* Kalender */}
-        <View className="mt-5 rounded-[28px] border border-bw-line bg-bw-card p-4">
+        <Card size="sm" className="mt-5 overflow-hidden rounded-[28px] border-bw-line bg-bw-card p-4 gap-0">
           <View className="flex-row items-center justify-between">
             <Pressable
               onPress={() => geserBulan(-1)}
@@ -259,7 +294,7 @@ export default function LayarAgenda() {
                 ))}
               </View>
 
-              {pekan.map((minggu, indeksPekan) => (
+{pekan.map((minggu, indeksPekan) => (
                 <View key={indeksPekan} className="flex-row">
                   {minggu.map((tanggal, indeksHari) => {
                     if (!tanggal) {
@@ -267,52 +302,17 @@ export default function LayarAgenda() {
                     }
 
                     const kunci = kunciTanggal(tanggal);
-                    const aktif = kunci === kunciTerpilih;
-                    const adalahHariIni = kunci === hariIni;
-                    const jumlah = jumlahPerHari.get(kunci) ?? 0;
-
                     return (
-                      <Pressable
+                      <SelHari
                         key={indeksHari}
-                        onPress={() => setTerpilih(tanggal)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${tanggal.getDate()} ${
-                          NAMA_BULAN[tanggal.getMonth()]
-                        }${jumlah > 0 ? `, ${jumlah} jadwal` : ''}`}
-                        accessibilityState={{ selected: aktif }}
-                        className="h-12 flex-1 items-center justify-center"
-                      >
-                        <View
-                          className={`h-10 w-10 items-center justify-center rounded-full ${
-                            aktif
-                              ? 'bg-bw-blue'
-                              : adalahHariIni
-                                ? 'border border-bw-blue bg-bw-blue-50'
-                                : ''
-                          }`}
-                        >
-                          <Text
-                            className={`text-sm ${
-                              aktif
-                                ? 'font-extrabold text-white'
-                                : adalahHariIni
-                                  ? 'font-extrabold text-bw-blue-700'
-                                  : indeksHari === 6
-                                    ? 'font-semibold text-bw-red'
-                                    : 'font-semibold text-bw-ink'
-                            }`}
-                          >
-                            {tanggal.getDate()}
-                          </Text>
-                          {jumlah > 0 ? (
-                            <View
-                              className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-                                aktif ? 'bg-white' : 'bg-bw-blue'
-                              }`}
-                            />
-                          ) : null}
-                        </View>
-                      </Pressable>
+                        tanggal={tanggal}
+                        indeksHari={indeksHari}
+                        aktif={kunci === kunciTerpilih}
+                        adalahHariIni={kunci === hariIni}
+                        jumlah={jumlahPerHari.get(kunci) ?? 0}
+                        libur={liburPerKunci.get(kunci) ?? []}
+                        onPilih={setTerpilih}
+                      />
                     );
                   })}
                 </View>
@@ -340,24 +340,51 @@ export default function LayarAgenda() {
                 <Ikon nama="chevron-forward" token="bw-ink-2" ukuran={18} />
               </Pressable>
             </View>
-          )}
-        </View>
+)}
+        </Card>
 
         {/* Judul daftar */}
-        <View className="mt-6 flex-row items-end justify-between">
-          <View className="min-w-0 flex-1 pr-3">
-            <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
-              {sudahHariIni ? 'Hari ini' : 'Tanggal dipilih'}
-            </Text>
-            <Text className="mt-1 text-lg font-extrabold text-bw-ink">
-              {formatTanggalPanjang(terpilih.toISOString())}
-            </Text>
+        <View className="mt-6">
+          <View className="flex-row items-end justify-between">
+            <View className="min-w-0 flex-1 pr-3">
+              <Text className="text-xs font-bold uppercase tracking-widest text-bw-muted">
+                {sudahHariIni ? 'Hari ini' : 'Tanggal dipilih'}
+              </Text>
+              <Text className="mt-1 text-lg font-extrabold text-bw-ink">
+                {formatTanggalPanjang(terpilih.toISOString())}
+              </Text>
+            </View>
+            <View className="rounded-full bg-bw-blue-50 px-3 py-1.5">
+              <Text className="text-xs font-bold text-bw-blue-700">
+                {baris.length} jadwal
+              </Text>
+            </View>
           </View>
-          <View className="rounded-full bg-bw-blue-50 px-3 py-1.5">
-            <Text className="text-xs font-bold text-bw-blue-700">
-              {baris.length} jadwal
-            </Text>
-          </View>
+          {liburTerpilih.length > 0 ? (
+            <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+              {liburTerpilih.map((l, idx) => (
+                  <Lencana
+                    key={idx}
+                    className={
+                      l.tipe === 'libur_nasional'
+                        ? 'border-bw-red-100 bg-bw-red-50'
+                        : l.tipe === 'cuti_bersama'
+                          ? 'border-bw-amber-200 bg-bw-amber-50'
+                          : 'border-bw-line bg-bw-surface'
+                    }
+                    teks={
+                      l.tipe === 'libur_nasional'
+                        ? 'text-bw-red'
+                        : l.tipe === 'cuti_bersama'
+                          ? 'text-bw-ink-2'
+                          : 'text-bw-ink-2'
+                    }
+                  >
+                    {l.tipe === 'libur_nasional' ? 'Libur Nasional' : l.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Acara'}: {l.nama}
+                  </Lencana>
+                ))}
+              </View>
+            ) : null}
         </View>
 
         {memuat && baris.length === 0 ? (
@@ -387,25 +414,27 @@ export default function LayarAgenda() {
               item={item}
               sesi={sesi}
               now={now}
-              onTekan={() => undefined}
+              onTekan={lakukanTidakAda}
             />
           ))}
         </View>
 
-        <Pressable
+        <Button
+          variant="outline"
+          size="lg"
           onPress={() => muatUlang({ senyap: true })}
-          accessibilityRole="button"
-          className="mt-6 h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-bw-line bg-bw-card active:opacity-70"
+          accessibilityLabel="Muat ulang agenda"
+          className="mt-6 h-12 flex-row items-center justify-center gap-2 rounded-2xl border-bw-line bg-bw-card data-[hover=true]:bg-bw-surface data-[active=true]:bg-bw-surface"
         >
           <Ikon nama="refresh" token="bw-ink-2" ukuran={18} />
-          <Text className="text-sm font-bold text-bw-ink-2">Muat ulang</Text>
-        </Pressable>
+          <ButtonText className="text-sm font-bold text-bw-ink-2">Muat ulang</ButtonText>
+        </Button>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function BarisAgenda({
+const BarisAgenda = memo(function BarisAgenda({
   item,
   sesi,
   now,
@@ -469,4 +498,88 @@ function BarisAgenda({
       </View>
     </Pressable>
   );
-}
+});
+
+// Satu sel tanggal di grid kalender. Di-memo supaya 42 sel tidak ikut
+// di-render ulang tiap kali layar render (misalnya saat menit berganti atau
+// data jadwal dimuat ulang); prop-nya hanya berubah untuk sel yang terpilih.
+const SelHari = memo(function SelHari({
+  tanggal,
+  indeksHari,
+  aktif,
+  adalahHariIni,
+  jumlah,
+  libur,
+  onPilih,
+}: {
+  tanggal: Date;
+  indeksHari: number;
+  aktif: boolean;
+  adalahHariIni: boolean;
+  jumlah: number;
+  libur: readonly HariLibur[];
+  onPilih: (tanggal: Date) => void;
+}) {
+  const adaLibur = libur.length > 0;
+  const liburNasional = libur.some((l) => l.tipe === 'libur_nasional');
+  const teksMerah = indeksHari === 6 || liburNasional;
+
+  const accessLabel = `${tanggal.getDate()} ${NAMA_BULAN[tanggal.getMonth()]}${
+    jumlah > 0 ? `, ${jumlah} jadwal` : ''
+  }${adaLibur ? `, hari libur: ${libur.map((l) => l.nama).join(', ')}` : ''}`;
+
+  return (
+    <Pressable
+      onPress={() => onPilih(tanggal)}
+      accessibilityRole="button"
+      accessibilityLabel={accessLabel}
+      accessibilityState={{ selected: aktif }}
+      className="h-12 flex-1 items-center justify-center active:opacity-70"
+    >
+      <View
+        className={`h-10 w-10 items-center justify-center rounded-full ${
+          aktif
+            ? 'bg-bw-blue'
+            : adalahHariIni
+              ? 'border border-bw-blue bg-bw-blue-50'
+              : ''
+        }`}
+      >
+        <Text
+          className={`text-sm ${
+            aktif
+              ? 'font-extrabold text-white'
+              : adalahHariIni
+                ? 'font-extrabold text-bw-blue-700'
+                : teksMerah
+                  ? 'font-semibold text-bw-red'
+                  : 'font-semibold text-bw-ink'
+          }`}
+        >
+          {tanggal.getDate()}
+        </Text>
+        {jumlah > 0 ? (
+          <View
+            className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+              aktif ? 'bg-white' : 'bg-bw-blue'
+            }`}
+          />
+        ) : null}
+        {adaLibur && jumlah === 0 ? (
+          <View
+            className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+              aktif ? 'bg-white' : 'bg-bw-red'
+            }`}
+          />
+        ) : null}
+        {adaLibur && jumlah > 0 ? (
+          <View
+            className={`absolute bottom-2 h-1.5 w-1.5 rounded-full ${
+              aktif ? 'bg-white' : 'bg-bw-red'
+            }`}
+          />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+});

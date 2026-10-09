@@ -1,23 +1,24 @@
 import { useState } from 'react';
 import {
-  Pressable,
   Text,
   TextInput,
   View,
   type KeyboardTypeOptions,
   type ReturnKeyTypeOptions,
 } from 'react-native';
+import { Input, InputField, InputSlot } from '../components/ui/input';
 import { Ikon } from './Ikon';
 
 // Isian formulir untuk halaman auth: masuk, daftar, dan atur ulang kata sandi.
 //
-//previously markup-nya ditulis ulang di tiap layar, jadi perubahan tinggi atau
+// Awalnya markup-nya ditulis ulang di tiap layar, jadi perubahan tinggi atau
 // warna ikon harus diubah di empat tempat. Sekarang satu komponen, dan keempat
-// layar otomatis terlihat sama.
+// layar otomatis terlihat sama. Isian ini memakai Input gluestack supaya
+// cincin fokus dan tag aksesibilitasnya datang dari satu tempat.
 //
 // Perbedaan penting dari isian biasa: tinggi minimum 56 poin, karena di layar
-// aplikasi dipakai sambil berdiri dengan satu tangan, target sentuh yang kecil akan
-// kecil akan sering meleset.
+// aplikasi dipakai sambil berdiri dengan satu tangan, target sentuh yang kecil
+// akan sering meleset.
 
 export type JenisBidang = 'teks' | 'email' | 'sandi';
 
@@ -27,7 +28,7 @@ export interface BidangAuthProps {
   onUbah: (nilai: string) => void;
   jenis?: JenisBidang;
   placeholder?: string;
-  autoComplete?: 'email' | 'password' | 'name' | 'off';
+  autoComplete?: 'email' | 'password' | 'new-password' | 'name' | 'off';
   keyboardType?: KeyboardTypeOptions;
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmit?: () => void;
@@ -59,7 +60,7 @@ export function BidangAuth({
         ? 'lock-closed-outline'
         : 'person-outline';
 
-  const token = fokus ? 'bw-blue' : 'bw-muted';
+  const tokenIkon = fokus ? 'bw-blue' : 'bw-muted';
 
   return (
     <View>
@@ -67,15 +68,19 @@ export function BidangAuth({
         {label}
       </Text>
 
-      <View
-        className={`h-14 flex-row items-center gap-2.5 rounded-2xl border-2 bg-bw-surface pl-4 pr-1 ${
-          fokus ? 'border-bw-blue' : 'border-transparent'
+      <Input
+        className={`h-14 rounded-2xl border-2 px-4 data-[focus=true]:border-bw-blue ${
+          fokus ? 'border-bw-blue' : 'border-bw-line'
         }`}
       >
-        {adaIkon ? <Ikon nama={namaIkon} token={token} ukuran={18} /> : null}
+        {adaIkon ? (
+          <InputSlot>
+            <Ikon nama={namaIkon} token={tokenIkon} ukuran={18} />
+          </InputSlot>
+        ) : null}
 
-        <TextInput
-          ref={refInput}
+        <InputField
+          ref={refInput as React.Ref<React.ComponentRef<typeof InputField>>}
           value={nilai}
           onChangeText={onUbah}
           onFocus={() => setFokus(true)}
@@ -87,16 +92,15 @@ export function BidangAuth({
           keyboardType={keyboardType}
           textContentType={jenis === 'email' ? 'emailAddress' : undefined}
           placeholder={placeholder}
-          placeholderTextColor="#9a9aa0"
           accessibilityLabel={label}
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmit}
           blurOnSubmit={false}
-          className="flex-1 text-base text-bw-ink"
+          className="flex-1 text-base text-bw-ink placeholder:text-bw-muted"
         />
 
         {jenis === 'sandi' ? (
-          <Pressable
+          <InputSlot
             onPress={() => setLihatSandi((v) => !v)}
             accessibilityRole="button"
             accessibilityLabel={lihatSandi ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
@@ -108,9 +112,9 @@ export function BidangAuth({
               token="bw-muted"
               ukuran={20}
             />
-          </Pressable>
+          </InputSlot>
         ) : null}
-      </View>
+      </Input>
     </View>
   );
 }

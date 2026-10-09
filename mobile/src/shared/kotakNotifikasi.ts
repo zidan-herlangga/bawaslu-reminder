@@ -110,6 +110,29 @@ export function tandaiSemuaDibaca(daftar: readonly Notifikasi[]): Notifikasi[] {
 }
 
 /**
+ * Membuang satu notifikasi dari daftar.
+ *
+ * Mengembalikan daftar baru, bukan mengubah daftar yang sama, supaya React
+ * bisa menggambar ulang layar setelah penghapusan.
+ */
+export function hapusDariDaftar(
+  daftar: readonly Notifikasi[],
+  id: string
+): Notifikasi[] {
+  return daftar.filter((item) => item.id !== id);
+}
+
+/**
+ * Menghapus seluruh notifikasi sekaligus.
+ *
+ * Selalu mengembalikan daftar kosong yang baru, bukan mengubah daftar yang
+ * sama, supaya React bisa menggambar ulang layar setelah penghapusan.
+ */
+export function hapusSemuaDariDaftar(daftar: readonly Notifikasi[]): Notifikasi[] {
+  return [];
+}
+
+/**
  * Notifikasi yang baru muncul sejak pemuatan sebelumnya.
  *
  * Web memakai ini untuk membunyikan suara pengingat begitu notifikasi masuk,
@@ -120,14 +143,31 @@ export function tandaiSemuaDibaca(daftar: readonly Notifikasi[]): Notifikasi[] {
  *
  * Parameter `sudahDilihat` harus berisi id yang sudah pernah dimuat. Bernilai
  * true berarti pemuatan ini yang pertama, jadi tidak ada yang baru.
+ *
+ * Parameter `maksWaktuDilihat`, kalau berangka, adalah nilai created_at paling
+ * baru yang pernah dimuat (dalam milidetik). Notifikasi di kotak masuk selalu
+ * terurut dari yang terbaru, dan baris baru selalu mendarat di atas. Jadi sebuah
+ * baris hanya benar-benar baru kalau dibuat setelah maksimum ini. Tanpa patokan
+ * ini, baris lama yang baru masuk jendela 30 teratas - misalnya karena baris di
+ * atasnya dihapus - disangka kabar baru, berbunyi, dan membuat pengguna merasa
+ * notifikasinya justru berlipat. Baris punya created_at kosong ikut dianggap
+ * bukan baru, karena waktu kemunculannya memang tidak diketahui.
  */
 export function notifikasiBaru(
   barisSekarang: readonly Notifikasi[],
   sudahDilihat: ReadonlySet<string>,
-  pemuatanPertama: boolean
+  pemuatanPertama: boolean,
+  maksWaktuDilihat?: number
 ): Notifikasi[] {
   if (pemuatanPertama) return [];
-  return barisSekarang.filter((item) => !sudahDilihat.has(item.id));
+  return barisSekarang.filter((item) => {
+    if (sudahDilihat.has(item.id)) return false;
+    if (Number.isFinite(maksWaktuDilihat)) {
+      const t = Date.parse(item.dibuatPada);
+      return Number.isFinite(t) && t > (maksWaktuDilihat ?? 0);
+    }
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +201,8 @@ export type AksiKotak =
   | { jenis: 'muat'; userId: string; daftar: Notifikasi[] }
   | { jenis: 'tandai'; userId: string; id: string }
   | { jenis: 'tandaiSemua'; userId: string }
+  | { jenis: 'hapus'; userId: string; id: string }
+  | { jenis: 'hapusSemua'; userId: string }
   | { jenis: 'gulungBalik'; userId: string };
 
 export function kotakAwal(): KeadaanKotak {
@@ -178,9 +220,10 @@ export function kotakAwal(): KeadaanKotak {
  *   ikut ditolak saat pemiliknya berbeda, maka staf berikutnya yang masuk di
  *   perangkat yang sama tidak akan pernah mendapat daftar sama sekali, karena
  *   state lama masih ada dan tidak pernah dikosongkan.
- * - Aksi yang mengubah isi daftar ('tandai', 'tandaiSemua', 'gulungBalik')
- *   ditolak kalau pemiliknya berbeda. Ini yang mencegah hasil query lama milik
- *   staf A menimpa daftar yang sedang dilihat staf B.
+ * - Aksi yang mengubah isi daftar ('tandai', 'tandaiSemua', 'hapus',
+ *   'hapusSemua', 'gulungBalik') ditolak kalau pemiliknya berbeda. Ini yang
+ *   mencegah hasil query lama milik staf A menimpa daftar yang sedang dilihat
+ *   staf B.
  *
  * Kalau 'muat' untuk staf A tiba belakangan setelah staf B masuk, pemilik daftar
  * berubah jadi A dan layar menampilkan kosong, bukan menampilkan data A. Ini
@@ -215,6 +258,26 @@ export function reducerKotak(
       return {
         userId: keadaan.userId,
         daftar: tandaiSemuaDibaca(keadaan.daftar),
+        gulungBalik: keadaan.daftar,
+      };
+    }
+
+    case 'hapus': {
+      // Tidak ada di daftar: tidak ada yang berubah, dan tidak perlu snapshot.
+      if (!keadaan.daftar.some((item) => item.id === aksi.id)) return keadaan;
+      return {
+        userId: keadaan.userId,
+        daftar: hapusDariDaftar(keadaan.daftar, aksi.id),
+        gulungBalik: keadaan.daftar,
+      };
+    }
+
+    case 'hapusSemua': {
+      // Sudah kosong: tidak ada yang berubah, dan tidak perlu snapshot.
+      if (keadaan.daftar.length === 0) return keadaan;
+      return {
+        userId: keadaan.userId,
+        daftar: hapusSemuaDariDaftar(keadaan.daftar),
         gulungBalik: keadaan.daftar,
       };
     }

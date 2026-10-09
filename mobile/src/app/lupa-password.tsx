@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+﻿import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../komponen/SafeAreaView';
 import { BidangAuth, KotakPesan } from '../komponen/BidangAuth';
 import { Ikon } from '../komponen/Ikon';
 import { useSesi } from '../lib/session';
@@ -21,12 +21,15 @@ import { normalkanEmail, pesanGalatAuth } from '../shared/daftar';
 // tanpa memberi tahu apakah email itu terdaftar atau tidak. Memberi tahu
 // hanya akan membuat orang bisa menebak-nebak email rekan kerja.
 //
-// redirectTo memakai skema aplikasi, bukan alamat web. Kalau tautannya membuka
-// peramban, orang akan melihat halaman web, bukan langkah kedua di sini.
+// redirectTo menunjuk halaman web, bukan skema aplikasi: tautan dari email
+// dibuka di peramban, dan orang mengetik kata sandi barunya di web. Layar
+// reset-password di sini tetap ada sebagai cadangan untuk tautan lama yang
+// sudah terlanjur memakai skema aplikasi.
 //
 // Satu hal yang tidak bisa dikerjakan dari sisi kode: Supabase hanya menerima
 // redirectTo yang terdaftar di Authentication > URL Configuration. Kalau
-// tautannya tidak masuk ke aplikasi, tambahkan skema aplikasi di sana dulu.
+// tautannya tidak membuka halaman web, daftarkan alamat situs (misalnya
+// https://bawasagenda.vercel.app/reset-password) di sana dulu.
 
 export default function LayarLupaPassword() {
   const { kirimTautanAturUlang } = useSesi();
@@ -72,7 +75,8 @@ export default function LayarLupaPassword() {
               </Text>
               <Text className="mt-2 text-center text-sm leading-relaxed text-bw-muted">
                 Periksa kotak masuk dan folder spam di {normalkanEmail(email)}. Tautan
-                itu membuka aplikasi ini, dan hanya berlaku sekali.
+                itu membuka halaman web untuk membuat kata sandi baru, dan hanya
+                berlaku sekali.
               </Text>
             </View>
 

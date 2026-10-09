@@ -64,6 +64,10 @@ export interface HasilKotakNotifikasi {
   tandaiDibaca: (id: string) => Promise<void>;
   /** Menandai semua notifikasi sudah dibaca sekaligus. */
   tandaiSemuaDibaca: () => Promise<void>;
+  /** Menghapus satu notifikasi dari kotak masuk dan dari database. */
+  hapus: (id: string) => Promise<void>;
+  /** Menghapus seluruh notifikasi dari kotak masuk dan dari database. */
+  hapusSemua: () => Promise<void>;
   muatUlang: () => Promise<void>;
 }
 
@@ -93,6 +97,10 @@ export function useKotakNotifikasi(sessionId: string | null): HasilKotakNotifika
 
   // Id yang sudah pernah dimuat, untuk membedakan notifikasi baru dari yang lama.
   const sudahDilihat = useRef<Set<string>>(new Set());
+  // created_at paling baru yang pernah dimuat, dalam milidetik. Baris lama yang
+  // baru masuk jendela 30 teratas setelah baris lain dihapus punya waktu yang
+  // lebih dulu dari ini, jadi tidak disangka notifikasi baru.
+  const maksWaktuDilihat = useRef(0);
   const pemuatanPertama = useRef(true);
 
   // Keadaan milik staf ini saja. Tanpa penapis ini, baris milik staf sebelumnya
@@ -118,13 +126,24 @@ export function useKotakNotifikasi(sessionId: string | null): HasilKotakNotifika
         (data ?? []) as (BarisNotifikasi | null)[]
       );
 
-      // Perhitungan notifikasi baru harus selesai sebelum himpunan id diperbarui.
-      // Kalau dibalik, semua id akan dianggap sudah pernah dilihat dan tidak ada
-      // yang pernah dipresentasikan.
-      const baru = notifikasiBaru(baris, sudahDilihat.current, pemuatanPertama.current);
+      // Perhitungan notifikasi baru harus selesai sebelum penanda waktu
+      // diperbarui. Kalau dibalik, semua baris akan dianggap sudah pernah
+      // dilihat dan tidak ada yang pernah dipresentasikan.
+      const baru = notifikasiBaru(
+        baris,
+        sudahDilihat.current,
+        pemuatanPertama.current,
+        maksWaktuDilihat.current
+      );
 
       pemuatanPertama.current = false;
       sudahDilihat.current = new Set(baris.map((item) => item.id));
+      let maks = maksWaktuDilihat.current;
+      for (const item of baris) {
+        const t = Date.parse(item.dibuatPada);
+        if (Number.isFinite(t) && t > maks) maks = t;
+      }
+      maksWaktuDilihat.current = maks;
 
       setGalat('');
       kirim({ jenis: 'muat', userId: sessionId, daftar: baris });
@@ -183,6 +202,41 @@ export function useKotakNotifikasi(sessionId: string | null): HasilKotakNotifika
     }
   }, [sessionId]);
 
+  const hapusSatu = useCallback(
+    async (id: string) => {
+      if (!sessionId) return;
+
+      // Baris dibuang dari tampilan lebih dulu, lalu dari database. Kalau
+      // database menolak, daftar digulung balik; kalau berhasil, daftar tidak
+      // perlu diisi ulang karena penghapusan sudah mencerminkan database.
+      kirim({ jenis: 'hapus', userId: sessionId, id });
+
+      const { error } = await supabase.from('notifications').delete().eq('id', id);
+
+      if (error) {
+        kirim({ jenis: 'gulungBalik', userId: sessionId });
+        setGalat(susunPesanGalat(error.message));
+      }
+    },
+    [sessionId]
+  );
+
+  const hapusSemuaSekali = useCallback(async () => {
+    if (!sessionId) return;
+
+    if (!daftar.length) return;
+
+    // Seluruh baris dibuang dari tampilan lebih dulu, lalu dari database.
+    kirim({ jenis: 'hapusSemua', userId: sessionId });
+
+    const { error } = await supabase.from('notifications').delete().eq('penerima_id', sessionId);
+
+    if (error) {
+      kirim({ jenis: 'gulungBalik', userId: sessionId });
+      setGalat(susunPesanGalat(error.message));
+    }
+  }, [sessionId, daftar.length]);
+
   useEffect(() => {
     if (!sessionId) {
       // Tidak ada state yang perlu dikosongkan: daftar milik sesi lama sudah tidak
@@ -191,6 +245,7 @@ export function useKotakNotifikasi(sessionId: string | null): HasilKotakNotifika
       // disangka baru ketika ia masuk lagi.
       pemuatanPertama.current = true;
       sudahDilihat.current = new Set();
+      maksWaktuDilihat.current = 0;
       return;
     }
 
@@ -250,6 +305,8 @@ export function useKotakNotifikasi(sessionId: string | null): HasilKotakNotifika
     galat,
     tandaiDibaca: tandaiSatu,
     tandaiSemuaDibaca: tandaiSemua,
+    hapus: hapusSatu,
+    hapusSemua: hapusSemuaSekali,
     muatUlang,
   };
 }

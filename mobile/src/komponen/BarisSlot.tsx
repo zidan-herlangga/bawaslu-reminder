@@ -4,6 +4,7 @@ import DateTimePicker, {
 import { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Ikon } from './Ikon';
+import { useTema } from '../tema/TemaProvider';
 
 // Formulir jadwal untuk aplikasi native.
 //
@@ -13,6 +14,9 @@ import { Ikon } from './Ikon';
 // - Web memakai <input type="datetime-local">. React Native tidak punya
 //   padanannya, jadi tanggal dan jam dipilih terpisah lewat dialog bawaan
 //   sistem
+// - Sama seperti mulai, selesai juga punya tanggal dan jam yang bisa dipilih
+//   sendiri. Tanggal selesai boleh berbeda dari tanggal mulai, jadi ini bisa
+//   dipakai untuk acara yang melewati tengah malam
 // - Android menampilkan dialog sendiri lalu menutup sendiri. iOS menampilkan
 //   roda angka (spinner), jadi picker di sana tidak ditutup otomatis: setiap
 //   perubahan roda akan memicu onChange, dan menutupnya seketika membuat
@@ -53,6 +57,7 @@ export function BarisSlot({
 }) {
   const [pemilih, setPemilih] = useState<Pemilihan | null>(null);
   const diIos = Platform.OS === 'ios';
+  const { dipakai } = useTema();
 
   const terapkan = (peristiwa: DateTimePickerEvent, terpilih?: Date) => {
     // Android menutup dialognya sendiri setiap kali ada hasil (set atau batal).
@@ -74,10 +79,16 @@ export function BarisSlot({
       return;
     }
 
-    // Selesai hanya jamnya yang diganti, tanggalnya ikut tanggal mulai. Kalau
-    // tanggal mulai belum diisi, pakai tanggal yang baru dipilih supaya tidak
-    // muncul di hari yang salah.
-    onUbah(indeks, 'selesai', gabungTanggal(nilaiMulai ?? terpilih, terpilih));
+    // Selesai punya tanggal dan jamnya sendiri. Tanggalnya boleh berbeda dari
+    // tanggal mulai (misalnya acara lintas tengah malam). Saat memilih tanggal,
+    // jam selesai yang sudah dipilih dipertahankan; saat memilih jam, tanggal
+    // selesai dipertahankan (atau ikut tanggal mulai kalau belum ada).
+    const waktuSekarang = nilaiSelesai ?? nilaiMulai;
+    const hasil =
+      aktif.mode === 'date'
+        ? gabungTanggal(terpilih, waktuSekarang ?? terpilih)
+        : gabungTanggal(waktuSekarang ?? terpilih, terpilih);
+    onUbah(indeks, 'selesai', hasil);
   };
 
   const nilaiPicker = pemilih
@@ -152,10 +163,18 @@ export function BarisSlot({
       </View>
       <View className="flex-row gap-2">
         <TombolPilih
-          ikon="time-outline"
-          label={nilaiSelesai ? formatJamPendek(nilaiSelesai) : 'Jam selesai'}
+          ikon="calendar-outline"
+          label={nilaiSelesai ? formatTanggalPendek(nilaiSelesai) : 'Tanggal'}
           aktif={Boolean(nilaiSelesai)}
-          terbuka={pemilih?.bidang === 'selesai'}
+          terbuka={pemilih?.bidang === 'selesai' && pemilih.mode === 'date'}
+          onTekan={() => setPemilih({ indeks, bidang: 'selesai', mode: 'date' })}
+          accessibilityLabel="Ubah tanggal selesai"
+        />
+        <TombolPilih
+          ikon="time-outline"
+          label={nilaiSelesai ? formatJamPendek(nilaiSelesai) : 'Jam'}
+          aktif={Boolean(nilaiSelesai)}
+          terbuka={pemilih?.bidang === 'selesai' && pemilih.mode === 'time'}
           onTekan={() => setPemilih({ indeks, bidang: 'selesai', mode: 'time' })}
           accessibilityLabel="Ubah jam selesai"
         />
@@ -191,7 +210,8 @@ export function BarisSlot({
               display="spinner"
               locale="id-ID"
               onChange={terapkan}
-              accentColor="#0071e3"
+              accentColor="#E02401"
+              themeVariant={dipakai === 'gelap' ? 'dark' : 'light'}
             />
             <Pressable
               accessibilityRole="button"

@@ -5,42 +5,48 @@
    "inline" supaya utility seperti bg-bw-canvas menulis rujukan ke var(--bw-*),
    bukan nilai hex yang sudah dibekukan saat build. */
 :root {
-  --bw-blue: #0071e3;
-  --bw-blue-hi: #0062c4;
-  --bw-blue-50: #eaf4fd;
-  --bw-blue-100: #d6e9fa;
-  --bw-blue-200: #aed3f3;
-  --bw-blue-700: #0058ac;
-  --bw-blue-900: #0a3f66;
+  /* Merah merek (#e02401) dan emas (#eba83a): pasangan warna yang sama
+     dengan aplikasi Android. Token --bw-blue memegang aksen utama (tombol,
+     tautan, fokus) jadi namanya sengaja dipertahankan supaya class di
+     komponen tidak perlu diganti satu per satu. */
+  --bw-blue: #e02401;
+  --bw-blue-hi: #bc1e01;
+  --bw-blue-50: #fce9e6;
+  --bw-blue-100: #f7c8c0;
+  --bw-blue-200: #f09280;
+  --bw-blue-700: #921701;
+  --bw-blue-900: #550e00;
 
-  --bw-red: #d70015;
-  --bw-red-50: #fdecee;
-  --bw-red-100: #f9d8dd;
+  --bw-red: #d0342c;
+  --bw-red-50: #fcebea;
+  --bw-red-100: #f7d2d0;
   /* Merah pekat untuk isian yang di atasnya teks putih (tombol Hapus, badge).
-     Token --bw-red dipakai sebagai warna teks dan ikut berubah jadi merah
-     terang di mode gelap; kalau dipakai juga sebagai latar, teks putih di
-     atasnya hanya 2,8:1. Nilai ini sengaja tidak berubah saat tema berganti. */
-  --bw-red-solid: #c10841;
+     Token --bw-red dipakai juga sebagai warna teks, jadi nilainya harus
+     terang di mode gelap supaya kontrasnya di atas kartu gelap tetap tinggi.
+     Karena itu merah isian tidak memakai --bw-red: token ini punya nilai
+     sendiri per tema dan dijaga cukup pekat agar teks putih di atasnya lolos
+     4,5:1 (6,5:1 di terang, 5,0:1 di gelap). */
+  --bw-red-solid: #b3271f;
 
-  --bw-amber: #a85b00;
-  --bw-amber-50: #fdf3e6;
-  --bw-amber-200: #f4dcb8;
-  --bw-amber-500: #d98200;
-  --bw-amber-800: #8a4700;
-  --bw-amber-900: #6f3a00;
+  --bw-amber: #eba83a;
+  --bw-amber-50: #fdf6eb;
+  --bw-amber-200: #f6d8a6;
+  --bw-amber-500: #c18a30;
+  --bw-amber-800: #815c20;
+  --bw-amber-900: #594016;
 
-  --bw-green: #046c4e;
-  --bw-green-50: #e6f5ef;
-  --bw-green-200: #b7dfd0;
-  --bw-green-500: #05855f;
-  --bw-green-700: #045f45;
+  --bw-green: #15803d;
+  --bw-green-50: #eaf7ef;
+  --bw-green-200: #c0e6d0;
+  --bw-green-500: #22a55b;
+  --bw-green-700: #166534;
 
-  --bw-ink: #1c1c1e;
-  --bw-ink-2: #2c2c2e;
-  --bw-muted: #6b6b70;
-  --bw-line: #e1e1e4;
-  --bw-surface: #f4f4f6;
-  --bw-canvas: #f2f2f7;
+  --bw-ink: #1e1b18;
+  --bw-ink-2: #3a3530;
+  --bw-muted: #756f66;
+  --bw-line: #eae4db;
+  --bw-surface: #f6f1ea;
+  --bw-canvas: #faf7f3;
   /* Isian kartu. Dipakai menggantikan bg-white supaya mode gelap tidak
      membuat layar menyala. */
   --bw-card: #ffffff;
@@ -49,9 +55,9 @@
      Sengaja punya token sendiri: kalau memakai --bw-ink sebagai latar, warnanya
      ikut terbalik saat tema gelap sehingga teks putih berakhir di atas
      putih. Pasangan ini harus tetap gelap di kedua tema. */
-  --bw-solid: #1c1c1e;
-  --bw-solid-text: #f5f5f7;
-  --bw-solid-muted: rgba(245, 245, 247, 0.68);
+  --bw-solid: #221f1b;
+  --bw-solid-text: #faf7f3;
+  --bw-solid-muted: rgba(250, 247, 243, 0.68);
 
   /* Permukaan kaca: warna isian tetap mengikuti mode,gaussian blur layering. */
   --bw-glass: rgba(255, 255, 255, 0.72);
@@ -68,50 +74,57 @@
    jadi blok token gelap hanya perlu satu salinan dan tidak pernah bisa meleset
    antara media query dan pilihan eksplisit. */
 :root[data-tema='gelap'] {
-  --bw-blue: #0a84ff;
-    --bw-blue-hi: #409cff;
-    --bw-blue-50: #10243a;
-    --bw-blue-100: #16344f;
-    --bw-blue-200: #1d4a70;
-    --bw-blue-700: #6cb6ff;
-    --bw-blue-900: #cfe6ff;
+  /* Aksen utama memakai merah merek yang sama seperti mode terang, bukan
+     versi lebih terang. Alasannya isian aksen selalu di atasnya teks putih
+     (tombol "Masuk", "Simpan"): #e02401 memberi kontras 4,7:1 untuk teks
+     putih, sedangkan merah terang ala mode gelap hanya 2,8:1. Yang memang
+     harus terang adalah token teks di atas kartu gelap, yaitu
+     --bw-blue-700 dan --bw-blue-900. */
+  --bw-blue: #e02401;
+  --bw-blue-hi: #bc1e01;
+  --bw-blue-50: #1a0b07;
+  --bw-blue-100: #2e130d;
+  --bw-blue-200: #4d2016;
+  --bw-blue-700: #ff866b;
+  --bw-blue-900: #ffc7ba;
 
-    --bw-red: #ff6961;
-    --bw-red-50: #35181a;
-    --bw-red-100: #4d2023;
+  --bw-red: #ff7b72;
+  --bw-red-50: #331413;
+  --bw-red-100: #4a1d1a;
+  --bw-red-solid: #d0342c;
 
-    --bw-amber: #ffb340;
-    --bw-amber-50: #33240f;
-    --bw-amber-200: #4d361a;
-    --bw-amber-500: #ff9f0a;
-    --bw-amber-800: #ffd08a;
-    --bw-amber-900: #ffe0b0;
+  --bw-amber: #f5b840;
+  --bw-amber-50: #251c0a;
+  --bw-amber-200: #453412;
+  --bw-amber-500: #df9e14;
+  --bw-amber-800: #f2c14d;
+  --bw-amber-900: #fae1a8;
 
-    --bw-green: #32d74b;
-    --bw-green-50: #0f2f1c;
-    --bw-green-200: #1c4a30;
-    --bw-green-500: #30d158;
-    --bw-green-700: #7ce495;
+  --bw-green: #4ade80;
+  --bw-green-50: #0e2a16;
+  --bw-green-200: #163a22;
+  --bw-green-500: #22c55e;
+  --bw-green-700: #86efac;
 
-    --bw-ink: #f5f5f7;
-  --bw-ink-2: #ebebef;
-  --bw-muted: #a1a1a8;
-  --bw-line: #38383d;
+  --bw-ink: #f5f1ea;
+  --bw-ink-2: #e5ded4;
+  --bw-muted: #a8a094;
+  --bw-line: #2a2620;
   /* Urutan ketinggian harus mencerminkan mode terang: canvas < surface < card.
      Kalau surface lebih terang dari card, panel seksi akan terlihat seperti
      menumpuk keluar kartu, bukan tenantsang di dalamnya. */
-  --bw-surface: #121214;
-  --bw-canvas: #08080a;
-  --bw-card: #1c1c1e;
+  --bw-surface: #171410;
+  --bw-canvas: #0e0c0a;
+  --bw-card: #1c1814;
 
   /* Di mode gelap surface pekat dibuat sedikit lebih terang dari kanvas supaya
      tetap terlihat sebagai lapisan, tapi cukup gelap untuk teks terang. */
-  --bw-solid: #2c2c2e;
-  --bw-solid-text: #f5f5f7;
-  --bw-solid-muted: rgba(245, 245, 247, 0.72);
+  --bw-solid: #2a241e;
+  --bw-solid-text: #f5f1ea;
+  --bw-solid-muted: rgba(245, 241, 234, 0.72);
 
-  --bw-glass: rgba(28, 28, 30, 0.72);
-  --bw-glass-strong: rgba(28, 28, 30, 0.88);
+  --bw-glass: rgba(30, 26, 22, 0.72);
+  --bw-glass-strong: rgba(30, 26, 22, 0.88);
   --bw-glass-line: rgba(255, 255, 255, 0.14);
   --bw-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -18px rgba(0, 0, 0, 0.8);
 

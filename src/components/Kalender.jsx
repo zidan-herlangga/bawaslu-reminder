@@ -38,7 +38,7 @@ const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 const KATEGORI_STYLE = {
   Rapat: 'bg-bw-blue-50 text-bw-blue-700 ring-bw-blue-200',
-  Tugas: 'bg-bw-amber-50 text-bw-amber ring-bw-amber-200',
+  Tugas: 'bg-bw-amber-50 text-bw-amber-800 ring-bw-amber-200',
   Pengawasan: 'bg-bw-green-50 text-bw-green-700 ring-bw-green-200',
   Lainnya: 'bg-bw-surface text-bw-muted ring-bw-line',
 };

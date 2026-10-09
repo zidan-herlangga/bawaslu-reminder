@@ -6,7 +6,7 @@ const COLUMNS = 'id, teks, tanggal, selesai, created_at';
 
 const TABS = [
   { id: 'tanggal', label: 'Tanggal dipilih' },
-  { id: 'semua', label: 'Semua todo' },
+  { id: 'semua', label: 'Semua Tugas' },
 ];
 
 const FIELD_CLASS =
@@ -236,7 +236,7 @@ export default function TodoPage() {
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-bw-red">
               Daftar Tugas
             </p>
-            <h1 className="mt-0.5 font-display text-xl font-bold leading-snug text-bw-ink">Todo</h1>
+            <h1 className="mt-0.5 font-display text-xl font-bold leading-snug text-bw-ink">Buat Tugas</h1>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               Catatan tugas pribadi Anda, terpisah dari jadwal bersama.
             </p>
@@ -322,7 +322,7 @@ export default function TodoPage() {
 
         {!listLoading && visible.length === 0 && (
           <div className="rounded-3xl border border-dashed border-bw-line bg-bw-card px-5 py-8 text-center">
-            <p className="text-sm font-semibold text-bw-ink">Belum ada todo</p>
+            <p className="text-sm font-semibold text-bw-ink">Belum ada tugas</p>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
               {tab === 'tanggal'
                 ? 'Belum ada tugas pada tanggal yang dipilih.'

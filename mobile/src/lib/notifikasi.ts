@@ -85,15 +85,15 @@ interface KanalKategori {
 }
 
 const KANAL_PER_KATEGORI: Record<string, KanalKategori> = {
-  Rapat: { id: 'pengingat-rapat', suara: 'rapat', warna: '#0071e3' },
+  Rapat: { id: 'pengingat-rapat', suara: 'rapat', warna: '#E02401' },
   Tugas: { id: 'pengingat-tugas', suara: 'tugas', warna: '#1f9d55' },
-  Pengawasan: { id: 'pengingat-pengawasan', suara: 'pengawasan', warna: '#b45309' },
+  Pengawasan: { id: 'pengingat-pengawasan', suara: 'pengawasan', warna: '#EBA83A' },
 };
 
 const KANAL_LAIN: KanalKategori = {
   id: KANAL_REMINDER,
   suara: 'notification',
-  warna: '#0071e3',
+  warna: '#E02401',
 };
 
 /** Channel dan suara untuk sebuah kategori. Kategori asing memakai bawaan. */

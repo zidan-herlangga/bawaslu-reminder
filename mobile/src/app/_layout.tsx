@@ -1,5 +1,6 @@
 import '../../global.css';
 
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { vars } from 'nativewind';
@@ -9,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BatasGalat from '../komponen/BatasGalat';
 import { PengingatHost } from '../komponen/PengingatHost';
 import { ToastHost } from '../komponen/ToastHost';
+import { GluestackUIProvider } from '../components/ui/gluestack-ui-provider';
 import { SesiProvider, useSesi } from '../lib/session';
 import { useNotifikasiJadwal } from '../lib/useNotifikasiJadwal';
 import { TemaProvider, useTema } from '../tema/TemaProvider';
@@ -75,26 +77,32 @@ function Akar() {
   return (
     <View style={[vars(variabel), { flex: 1 }]} className="flex-1 bg-bw-canvas">
       <StatusBar style={dipakai === 'gelap' ? 'light' : 'dark'} animated />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade_from_bottom',
-          animationDuration: 220,
-          contentStyle: { backgroundColor: 'transparent' },
-        }}
-      >
-        {/* Formulir jadwal naik dari bawah seperti lembar, bukan pindah halaman. */}
-        <Stack.Screen
-          name="jadwal/baru"
-          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-        />
-        <Stack.Screen
-          name="jadwal/[id]"
-          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-        />
-      </Stack>
-      <PengingatHost />
-      <ToastHost />
+      <NavigationBar
+        hidden
+        style={dipakai === 'gelap' ? 'light' : 'dark'}
+      />
+      <GluestackUIProvider mode={dipakai === 'gelap' ? 'dark' : 'light'}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'fade_from_bottom',
+            animationDuration: 220,
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        >
+          {/* Formulir jadwal naik dari bawah seperti lembar, bukan pindah halaman. */}
+          <Stack.Screen
+            name="jadwal/baru"
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
+            name="jadwal/[id]"
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+        </Stack>
+        <PengingatHost />
+        <ToastHost />
+      </GluestackUIProvider>
     </View>
   );
 }

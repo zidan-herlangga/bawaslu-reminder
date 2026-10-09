@@ -1,5 +1,5 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+﻿import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import SafeAreaView from './SafeAreaView';
 import { Ikon } from './Ikon';
 
 export function LayarTunggu({
@@ -13,7 +13,7 @@ export function LayarTunggu({
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-8">
         <View className="h-20 w-20 items-center justify-center rounded-full bg-bw-blue-50">
-          <ActivityIndicator size="large" color="#0071e3" />
+          <ActivityIndicator size="large" color="#E02401" />
         </View>
         <Text className="mt-5 text-center text-base font-bold text-bw-ink">
           {pesan}

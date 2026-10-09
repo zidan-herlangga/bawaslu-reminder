@@ -2,25 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
-import { Platform, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import TabDock from '../../komponen/TabDock';
 import { useSesi } from '../../lib/session';
-import { useTema } from '../../tema/TemaProvider';
-import { useWarna } from '../../tema/warna';
 
-// Tab bawah.
+// Navigasi tab bawah.
 //
-// Tinggi tab = tinggi dasar + inset bawah perangkat (home indicator iPhone,
-// atau tombol Back/Home/Recent dan gesture bar di Android), sehingga tab
-// tidak pernah mepet atau tertutup navigasi sistem.
+// Bilah tab dirender oleh TabDock, bukan oleh Tabs bawaan. TabDock yang
+// memutuskan warna, tinggi, dan perilaku keyboard, jadi di sini cukup
+// mendeklarasikan nama layar + ikonnya.
+//
 // Label selalu terlihat: ikon saja tidak bisa dibaca staf yang baru pertama
 // kali memakai aplikasi.
-//
-// Warna diambil dari token tema, bukan hex yang ditulis di sini. Tab adalah
-// satu-satunya bagian navigasi yang bukan View Tailwind, jadi kalau warnanya
-// ditulis manual, tab tetap putih terang saat aplikasi sedang gelap.
-
-const TINGGI_DASAR = 58;
 
 type NamaIkon = ComponentProps<typeof Ionicons>['name'];
 
@@ -40,7 +32,7 @@ function ikonTab(aktif: NamaIkon, nonaktif: NamaIkon) {
     return (
       <Ionicons
         name={focused ? aktif : nonaktif}
-        size={size + 1}
+        size={size}
         // Ionicons hanya menerima string atau OpaqueColorValue, sedangkan
         // ColorValue bisa berupa PlatformColor. Warna tab selalu hex di sini.
         color={color as string}
@@ -51,54 +43,21 @@ function ikonTab(aktif: NamaIkon, nonaktif: NamaIkon) {
 
 export default function LayoutTab() {
   const { session, loading } = useSesi();
-  const insets = useSafeAreaInsets();
-  const { dipakai } = useTema();
-  const { warna } = useWarna();
 
   if (!loading && !session) {
     return <Redirect href="/masuk" />;
   }
 
-  // Minimal 10pt jarak bawah di Android walau inset 0 (mis. perangkat tertentu
-  // yang melaporkan inset kosong), supaya tab tidak menempel ke tepi layar.
-  const jarakBawah = Math.max(insets.bottom, Platform.OS === 'android' ? 10 : 0);
-
-  const gelap = dipakai === 'gelap';
-
   return (
     <Tabs
+      tabBar={(props) => <TabDock {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: warna('bw-blue'),
-        tabBarInactiveTintColor: warna('bw-muted'),
-        tabBarStyle: {
-          backgroundColor: warna('bw-card'),
-          // Di mode gelap bayangan tidak terlihat, jadi pemisah tipis di atas
-          // yang menggantikan bayangan supaya tab tidak menyatu dengan konten.
-          borderTopWidth: gelap ? StyleSheet.hairlineWidth : 0,
-          borderTopColor: warna('bw-line'),
-          height: TINGGI_DASAR + jarakBawah,
-          paddingTop: 8,
-          paddingBottom: jarakBawah + 4,
-          paddingHorizontal: 8,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          // Bayangan lembut agar tab terpisah dari konten.
-          elevation: gelap ? 0 : 12,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: gelap ? 0 : 0.08,
-          shadowRadius: 10,
-        },
-        tabBarItemStyle: {
-          borderRadius: 14,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
+        // Layar tab yang tidak sedang difokus tetap ter-mount (state-nya
+        // tersimpan), tapi berhenti di-render. Beranda dan Agenda sama-sama
+        // melanggan realtime + polling 30-an, jadi ini memotong kerja JS
+        // yang sia-sia saat tab tidak terlihat.
+        freezeOnBlur: true,
       }}
     >
       <Tabs.Screen

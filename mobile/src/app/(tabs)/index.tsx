@@ -1,7 +1,8 @@
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeAreaView from '../../komponen/SafeAreaView';
+import { Button, ButtonText } from '../../components/ui/button';
 import { DialogKonfirmasi } from '../../komponen/DialogKonfirmasi';
 import { Ikon } from '../../komponen/Ikon';
 import { KartuJadwal } from '../../komponen/KartuJadwal';
@@ -18,17 +19,7 @@ import { useKotakNotifikasi } from '../../lib/useKotakNotifikasi';
 import { formatJam, formatSisa } from '../../shared/formatWaktu';
 import { DIVISI_OPTIONS, DIVISI_SHORT } from '../../shared/options';
 import { sortByAgenda, type Jadwal, type Slot } from '../../shared/slots';
-
-// Beranda: daftar jadwal.
-//
-// Dua aturan yang dibawa dari web dan tidak diubah di sini:
-//
-// - Jadwal yang waktunya sudah lewat tidak disembunyikan, tapi dipindahkan ke
-//   bawah dan diberi lencana Selesai. Disembunyikan membuat orang bertanya "kok
-//   jadwal kemarin tidak ada", padahal memang sudah tidak perlu dipantau
-// - Pengurutan memakai sortByAgenda dari shared/slots, yang sama dipakai web.
-//   Kalau aturannya berbeda, orang bisa melihat urutan berbeda untuk data yang
-//   sama di dua perangkat
+import { dapatkanLiburPerTanggal } from '../../shared/hariLibur';
 
 const KELIP_MS = 30 * 1000;
 
@@ -39,10 +30,6 @@ export default function LayarBeranda() {
 
   const { jadwal, memuat, galat, terhubung, muatUlang } = useJadwal(userId);
 
-  // Kotak masuk notifikasi hidup di Beranda, bukan di layout akar, supaya tidak
-  // ada permintaan jaringan yang berjalan di layar yang sedang tidak terlihat.
-  // Badge tetap harus benar sejak layar pertama dibuka, jadi hook tetap dipasang
-  // di sini dan bukan lazily saat lonceng diketuk.
   const {
     notifikasi,
     belumDibaca,
@@ -50,22 +37,27 @@ export default function LayarBeranda() {
     galat: notifikasiGalat,
     tandaiDibaca,
     tandaiSemuaDibaca,
+    hapus: hapusNotifikasi,
+    hapusSemua: hapusSemuaNotifikasi,
     muatUlang: muatNotifikasi,
   } = useKotakNotifikasi(userId);
   const [kotakTerbuka, setKotakTerbuka] = useState(false);
 
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 60000) * 60000);
   const [divisi, setDivisi] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ jadwal: Jadwal; sesi: Slot | null } | null>(null);
   const [konfirmasi, setKonfirmasi] = useState<Jadwal | null>(null);
   const [hapusSibuk, setHapusSibuk] = useState(false);
   const [menyegarkan, setMenyegarkan] = useState(false);
 
-  // Waktu berjalan diperbarui tiap 30 detik supaya lencana Selesai muncul
-  // tanpa pengguna harus membuka ulang layar. Interval harus dibersihkan saat
-  // layar ditutup, kalau tidak ia tetap berjalan di latar.
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), KELIP_MS);
+    // Dibulatkan ke menit: jam/sisa waktu ditampilkan dengan presisi menit,
+    // jadi setNow dengan nilai jamak dalam satu menit yang sama membuat React
+    // membatalkan re-render (nilainya sama), hanya menit baru yang me-render.
+    const timer = setInterval(
+      () => setNow(Math.floor(Date.now() / 60000) * 60000),
+      KELIP_MS
+    );
     return () => clearInterval(timer);
   }, []);
 
@@ -80,11 +72,14 @@ export default function LayarBeranda() {
     for (const item of terlihat) {
       if (item.status !== 'Aktif') continue;
 
-      const sesi = (
+      // Urutkan slot berdasarkan waktu mulai agar selalu mendapatkan slot terdekat
+      const sortedSlots = (
         Array.isArray(item.slots) ? item.slots : []
       )
         .filter((s): s is Slot => Boolean(s?.mulai))
-        .find((s) => new Date(s.mulai).getTime() > now);
+        .sort((a, b) => new Date(a.mulai).getTime() - new Date(b.mulai).getTime());
+
+      const sesi = sortedSlots.find((s) => new Date(s.mulai).getTime() > now);
 
       if (sesi) return { item, sesi };
     }
@@ -101,17 +96,6 @@ export default function LayarBeranda() {
     }
   }, [muatUlang]);
 
-  /**
-   * Mengirim pengingat lewat endpoint yang sama dengan web: POST /api/notify
-   * dengan scheduleId dan token sesi. Endpoint itu ada di serverless Vercel,
-   * jadi tidak perlu backend baru untuk tahap ini.
-   *
-   * Memakai beriTahuStaf, bukan fetch sendiri: helper itu sudah menangani sesi
-   * yang habis, tidak ada koneksi, dan HTTP non-2xx. Versi sebelumnya membuang
-   * badan jawaban server, jadi "Hanya pembuat jadwal yang boleh mengirim
-   * pengingat." tidak pernah sampai ke pengguna dan yang tampil hanya
-   * "Gagal mengirim (HTTP 403)".
-   */
   const ingatkan = useCallback(async (item: Jadwal) => {
     const hasil = await beriTahuStaf(item.id);
     showToast(
@@ -137,12 +121,38 @@ export default function LayarBeranda() {
 
       showToast('Jadwal dihapus.', 'sukses');
       setDetail(null);
+      setKonfirmasi(null);
       await muatUlang({ senyap: true });
+    } catch (e) {
+      showToast('Terjadi kesalahan yang tidak terduga.', 'galat');
     } finally {
       setHapusSibuk(false);
-      setKonfirmasi(null);
     }
   }, [konfirmasi, muatUlang]);
+
+  // Callback stabil per jadwal: berlapis saat panggil via WadahKartuJadwal
+  // supaya prop kartu tidak berganti identitas tiap render layar.
+  const bukaDetail = useCallback((item: Jadwal) => {
+    setDetail({ jadwal: item, sesi: null });
+  }, []);
+
+  const ubahJadwal = useCallback(
+    (item: Jadwal) => router.push(`/jadwal/${item.id}`),
+    [router]
+  );
+
+  const hapusJadwal = useCallback((item: Jadwal) => {
+    setKonfirmasi(item);
+  }, []);
+
+  const liburHariIni = useMemo(() => {
+    const hariIniDate = new Date(now);
+    return dapatkanLiburPerTanggal(
+      hariIniDate.getFullYear(),
+      hariIniDate.getMonth(),
+      hariIniDate.getDate()
+    );
+  }, [now]);
 
   return (
     <SafeAreaView className="flex-1 bg-bw-canvas" edges={['top']}>
@@ -172,29 +182,31 @@ export default function LayarBeranda() {
           </View>
 
           <View className="flex-row items-center gap-2">
-            <Pressable
+            <Button
+              variant="outline"
+              size="lg"
               onPress={segarkan}
-              accessibilityRole="button"
               accessibilityLabel="Segarkan jadwal"
-              className="h-12 w-12 items-center justify-center rounded-full border border-bw-line bg-bw-card active:opacity-70"
+              className="h-12 w-12 rounded-full border-bw-line bg-bw-card px-0"
             >
               <Ikon nama="refresh" token="bw-ink-2" ukuran={20} />
-            </Pressable>
+            </Button>
 
             <TombolNotifikasi
               belumDibaca={belumDibaca}
               onPress={() => setKotakTerbuka(true)}
             />
 
-            <Pressable
+            <Button
+              variant="default"
+              size="lg"
               onPress={() => router.push('/jadwal/baru')}
-              accessibilityRole="button"
               accessibilityLabel="Buat jadwal baru"
-              className="h-12 flex-row items-center justify-center gap-1 rounded-full bg-bw-blue px-5 active:opacity-80"
+              className="h-12 flex-row gap-1 rounded-full px-5 bg-bw-blue data-[hover=true]:bg-bw-blue-hi data-[active=true]:bg-bw-blue-hi"
             >
               <Ikon nama="add" token="bw-blue-50" ukuran={20} />
-              <Text className="text-sm font-bold text-white">Buat</Text>
-            </Pressable>
+              <ButtonText className="text-sm font-bold text-white">Buat</ButtonText>
+            </Button>
           </View>
         </View>
 
@@ -221,27 +233,55 @@ export default function LayarBeranda() {
         </ScrollView>
 
         {/* Jadwal berikutnya */}
-        {berikutnya ? (
-          <View className="mt-5 rounded-[28px] bg-bw-blue p-5">
-            <View className="flex-row items-center gap-2">
-              <View className="h-8 w-8 items-center justify-center rounded-full bg-white/20">
-                <Ikon nama="alarm" token="bw-blue-50" ukuran={16} />
+        {(() => {
+          if (!berikutnya && liburHariIni.length === 0) return null;
+          return (
+            <View className={`mt-5 overflow-hidden rounded-[28px] ${berikutnya ? 'bg-bw-blue' : 'bg-bw-card border border-bw-line'}`}>
+              <View className="p-5">
+                {berikutnya ? (
+                  <>
+                    <View className="flex-row items-center gap-2">
+                      <View className="h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                        <Ikon nama="alarm" token="bw-blue-50" ukuran={16} />
+                      </View>
+                      <Text className="text-xs font-bold uppercase tracking-widest text-white/80">
+                        Berikutnya
+                      </Text>
+                    </View>
+                    <Text className="mt-3 text-xl font-extrabold text-white" numberOfLines={2}>
+                      {berikutnya.item.judul}
+                    </Text>
+                    <View className="mt-3 flex-row items-center self-start rounded-full bg-white/20 px-3 py-1.5">
+                      <Text className="text-xs font-bold text-white">
+                        {formatJam(berikutnya.sesi.mulai)} -{' '}
+                        {formatSisa(new Date(berikutnya.sesi.mulai).getTime(), now)}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
+                {liburHariIni.length > 0 && (
+                  <View className={berikutnya ? 'mt-4 border-t border-white/20 pt-4' : ''}>
+                    <View className="flex-row items-center gap-2">
+                      <View className={`h-8 w-8 items-center justify-center rounded-full ${berikutnya ? 'bg-white/20' : 'bg-bw-red-50'}`}>
+                        <Ikon nama="calendar" token={berikutnya ? 'bw-blue-50' : 'bw-red'} ukuran={16} />
+                      </View>
+                      <Text className={`text-xs font-bold uppercase tracking-widest ${berikutnya ? 'text-white/80' : 'text-bw-muted'}`}>
+                        Hari Ini
+                      </Text>
+                    </View>
+                    <View className="mt-2.5 flex-col gap-1.5">
+                      {liburHariIni.map((l, idx) => (
+                        <Text key={idx} className={`text-sm font-semibold ${berikutnya ? 'text-white' : 'text-bw-ink'}`} numberOfLines={2}>
+                          {l.tipe === 'libur_nasional' ? 'Libur Nasional' : l.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Acara'}: {l.nama}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
-              <Text className="text-xs font-bold uppercase tracking-widest text-white/80">
-                Berikutnya
-              </Text>
             </View>
-            <Text className="mt-3 text-xl font-extrabold text-white" numberOfLines={2}>
-              {berikutnya.item.judul}
-            </Text>
-            <View className="mt-3 flex-row items-center self-start rounded-full bg-white/20 px-3 py-1.5">
-              <Text className="text-xs font-bold text-white">
-                {formatJam(berikutnya.sesi.mulai)} -{' '}
-                {formatSisa(new Date(berikutnya.sesi.mulai).getTime(), now)}
-              </Text>
-            </View>
-          </View>
-        ) : null}
+          );
+        })()}
 
         {/* Galat */}
         {galat ? (
@@ -256,13 +296,14 @@ export default function LayarBeranda() {
               </Text>
             </View>
             <Text className="mt-1.5 text-xs leading-relaxed text-bw-red">{galat}</Text>
-            <Pressable
+            <Button
+              variant="default"
               onPress={() => muatUlang()}
-              accessibilityRole="button"
-              className="mt-3 h-12 items-center justify-center rounded-2xl bg-bw-red-solid active:opacity-80"
+              accessibilityLabel="Coba lagi muat jadwal"
+              className="mt-3 h-12 rounded-2xl bg-bw-red-solid data-[hover=true]:bg-bw-red-solid data-[active=true]:bg-bw-red-solid"
             >
-              <Text className="text-sm font-bold text-white">Coba lagi</Text>
-            </Pressable>
+              <ButtonText className="text-sm font-bold text-white">Coba lagi</ButtonText>
+            </Button>
           </View>
         ) : null}
 
@@ -283,8 +324,7 @@ export default function LayarBeranda() {
               Belum ada jadwal
             </Text>
             <Text className="mt-1.5 text-center text-xs leading-relaxed text-bw-muted">
-              Belum ada pengingat yang perlu dipantau. Jadwal baru dibuat dari
-              aplikasi web.
+              Belum ada pengingat yang perlu dipantau. Ketuk tombol &quot;Buat&quot; di atas untuk menambahkan jadwal baru.
             </Text>
           </View>
         ) : null}
@@ -292,15 +332,15 @@ export default function LayarBeranda() {
         {/* Daftar */}
         <View className="mt-5 gap-3">
           {terlihat.map((item) => (
-            <KartuJadwal
+            <WadahKartuJadwal
               key={item.id}
-              jadwal={item}
+              item={item}
               now={now}
               milikSaya={item.pembuat_id === userId}
-              onDetail={() => setDetail({ jadwal: item, sesi: null })}
-              onIngatkan={() => ingatkan(item)}
-              onUbah={() => router.push(`/jadwal/${item.id}`)}
-              onHapus={() => setKonfirmasi(item)}
+              onDetail={bukaDetail}
+              onIngatkan={ingatkan}
+              onUbah={ubahJadwal}
+              onHapus={hapusJadwal}
             />
           ))}
         </View>
@@ -320,43 +360,87 @@ export default function LayarBeranda() {
         onHapus={detail ? () => setKonfirmasi(detail.jadwal) : undefined}
       />
 
-<DialogKonfirmasi
-              terbuka={Boolean(konfirmasi)}
-              judul="Hapus jadwal?"
-              pesan={
-                konfirmasi
-                  ? `"${konfirmasi.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
-                  : ''
-              }
-              sibuk={hapusSibuk}
-              onBatal={() => setKonfirmasi(null)}
-              onSetuju={hapus}
-            />
+      <DialogKonfirmasi
+        terbuka={Boolean(konfirmasi)}
+        judul="Hapus jadwal?"
+        pesan={
+          konfirmasi
+            ? `"${konfirmasi.judul}" akan dihapus untuk semua staf. Tindakan ini tidak bisa dibatalkan.`
+            : ''
+        }
+        sibuk={hapusSibuk}
+        onBatal={() => setKonfirmasi(null)}
+        onSetuju={hapus}
+      />
 
-            <KotakNotifikasi
-              terbuka={kotakTerbuka}
-              notifikasi={notifikasi}
-              belumDibaca={belumDibaca}
-              memuat={notifikasiMemuat}
-              galat={notifikasiGalat}
-              onTutup={() => setKotakTerbuka(false)}
-              onBukaJadwal={(jadwalId) => {
-                setKotakTerbuka(false);
-                router.push(`/jadwal/${jadwalId}`);
-              }}
-              onTandaiDibaca={(id) => {
-                void tandaiDibaca(id);
-              }}
-              onTandaiSemuaDibaca={() => {
-                void tandaiSemuaDibaca();
-              }}
-              onCobaLagi={() => {
-                void muatNotifikasi();
-              }}
-            />
-          </SafeAreaView>
+      <KotakNotifikasi
+        terbuka={kotakTerbuka}
+        notifikasi={notifikasi}
+        belumDibaca={belumDibaca}
+        memuat={notifikasiMemuat}
+        galat={notifikasiGalat}
+        onTutup={() => setKotakTerbuka(false)}
+        onBukaJadwal={(jadwalId) => {
+          setKotakTerbuka(false);
+          router.push(`/jadwal/${jadwalId}`);
+        }}
+        onTandaiDibaca={(id) => {
+          void tandaiDibaca(id);
+        }}
+        onTandaiSemuaDibaca={() => {
+          void tandaiSemuaDibaca();
+        }}
+        onHapusSemua={() => {
+          void hapusSemuaNotifikasi();
+        }}
+        onHapus={(id) => {
+          void hapusNotifikasi(id);
+        }}
+        onCobaLagi={() => {
+          void muatNotifikasi();
+        }}
+      />
+    </SafeAreaView>
   );
 }
+
+// Pembungkus memo untuk satu KartuJadwal. Callback-nya dibuat stabil per item,
+// jadi kartu hanya di-render ulang kalau datanya benar-benar berubah (misalnya
+// saat daftar jadwal dimuat ulang), bukan untuk tiap re-render layar.
+const WadahKartuJadwal = memo(function WadahKartuJadwal({
+  item,
+  now,
+  milikSaya,
+  onDetail,
+  onIngatkan,
+  onUbah,
+  onHapus,
+}: {
+  item: Jadwal;
+  now: number;
+  milikSaya: boolean;
+  onDetail: (item: Jadwal) => void;
+  onIngatkan: (item: Jadwal) => void;
+  onUbah: (item: Jadwal) => void;
+  onHapus: (item: Jadwal) => void;
+}) {
+  const detail = useCallback(() => onDetail(item), [onDetail, item]);
+  const ingatkan = useCallback(() => onIngatkan(item), [onIngatkan, item]);
+  const ubah = useCallback(() => onUbah(item), [onUbah, item]);
+  const hapus = useCallback(() => onHapus(item), [onHapus, item]);
+
+  return (
+    <KartuJadwal
+      jadwal={item}
+      now={now}
+      milikSaya={milikSaya}
+      onDetail={detail}
+      onIngatkan={ingatkan}
+      onUbah={ubah}
+      onHapus={hapus}
+    />
+  );
+});
 
 function FilterChip({
   label,

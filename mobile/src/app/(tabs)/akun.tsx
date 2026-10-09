@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import SafeAreaView from '../../komponen/SafeAreaView';
+import { Card } from '../../components/ui/card';
 import { Ikon } from '../../komponen/Ikon';
 import { showToast } from '../../lib/toast';
 import { useSesi } from '../../lib/session';
@@ -202,7 +204,10 @@ export default function LayarAkun() {
         </Text>
 
         {/* Kartu profil */}
-        <View className="mt-5 overflow-hidden rounded-[28px] border border-bw-line bg-bw-card">
+        <Card
+          size="sm"
+          className="mt-5 flex-col overflow-hidden rounded-[28px] border-bw-line bg-bw-card p-0 gap-0"
+        >
           <View className="h-20 bg-bw-blue-50" />
           <View className="-mt-10 items-center px-5 pb-6">
             <View className="h-20 w-20 items-center justify-center rounded-full border-4 border-bw-card bg-bw-blue">
@@ -232,7 +237,17 @@ export default function LayarAkun() {
               </View>
             ) : null}
           </View>
-        </View>
+        </Card>
+
+        <Bagian judul="Keamanan">
+          <Baris
+            ikon="lock-closed-outline"
+            judul="Ubah kata sandi"
+            keterangan="Sandi lama diverifikasi sebelum diganti"
+            onTekan={() => router.push('/ubah-sandi')}
+            terakhir
+          />
+        </Bagian>
 
         <Bagian judul="Tampilan">
           <PemilihTema
@@ -303,25 +318,6 @@ export default function LayarAkun() {
           />
         </Bagian>
 
-        <Bagian
-          judul="Cara pengingat bekerja"
-          catatan={[
-            'Pengingat dalam aplikasi: sesi yang sedang berjalan atau dimulai',
-            'dalam 15 menit ke depan muncul sebagai banner, dan bertahan sampai',
-            'ditutup. Banner hanya muncul selama aplikasi terbuka.',
-            alasanTidakBisaDipakai()
-              ? `Notifikasi sistem: ${alasanTidakBisaDipakai()}`
-              : 'Notifikasi sistem: aktif, pengingat sampai walau aplikasi ditutup.',
-          ].join(' ')}
-        >
-          <Baris
-            ikon="information-circle-outline"
-            judul="Batas pengingat dalam aplikasi"
-            keterangan="Hanya saat aplikasi terbuka"
-            terakhir
-          />
-        </Bagian>
-
         <Bagian judul="Aplikasi">
           <Baris ikon="information-circle-outline" judul="Versi" keterangan="1.0.0" />
           <Baris
@@ -352,9 +348,12 @@ function Bagian({
       <Text className="mb-2 ml-1 text-xs font-bold uppercase tracking-widest text-bw-muted">
         {judul}
       </Text>
-      <View className="overflow-hidden rounded-3xl border border-bw-line bg-bw-card">
+      <Card
+        size="sm"
+        className="flex-col overflow-hidden rounded-3xl border-bw-line bg-bw-card p-0 gap-0"
+      >
         {children}
-      </View>
+      </Card>
       {catatan ? (
         <Text className="ml-1 mt-2 text-xs leading-relaxed text-bw-muted">{catatan}</Text>
       ) : null}

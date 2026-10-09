@@ -1,26 +1,15 @@
+import React from 'react';
 import { FlatList, Modal, Pressable, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ikon, type NamaIkon } from './Ikon';
 import type { Notifikasi } from '../shared/kotakNotifikasi';
 import { formatWaktuLengkap } from '../shared/formatWaktu';
 import type { TokenWarna } from '../tema/warna';
+import { useGesekTutup } from '../lib/useGesekTutup';
 
-// Kotak masuk notifikasi.
-//
-// Port dari panel notifikasi di src/components/AppShell.jsx. Perbedaannya hanya
-// pada wadah: web memakai panel yang mengambang di bawah tombol lonceng, karena
-// tidak ada tempat di bawah itu. Di layar sempit, panel setinggi hampir seluruh
-// layar justru menutupi isi yang seharusnya masih terlihat di atasnya.
-// Di sini jadi bottom sheet: muncul dari bawah, menutupi separuh layar, dan
-// bagian atasnya tetap kelihatan sebagai konteks.
-//
-// Keputusan soal interaksi:
-// - Ketuk satu baris untuk menandai sudah dibaca dan membuka jadwalnya, kalau
-//   baris itu memang punya jadwal. Dua hal dalam satu ketukan terasa wajar
-//   di layar sentuh; di web tidak begitu karena hover sudah memberi komentar
-// - Baris tanpa jadwal tetap bisa diketuk untuk ditandai sudah dibaca, karena
-//   minimal itu membuat badge berkurang
-
-/** Ikon per kategori, supaya staf bisa mengenali notifikasi tanpa membaca. */
+/** Ikon per kategori untuk identifikasi visual cepat */
 const IKON_KATEGORI: Record<string, { ikon: NamaIkon; token: TokenWarna }> = {
   Rapat: { ikon: 'people', token: 'bw-blue' },
   Tugas: { ikon: 'checkbox', token: 'bw-green-500' },
@@ -30,9 +19,6 @@ const IKON_KATEGORI: Record<string, { ikon: NamaIkon; token: TokenWarna }> = {
 
 const gayaKategori = (kategori: string | null) => {
   const gaya = IKON_KATEGORI[kategori ?? ''] ?? IKON_KATEGORI.Lainnya;
-  // noUncheckedIndexedAccess menganggap akses larik bisa undefined. Di sini
-  // kuncinya sudah dipastikan salah satu kunci statis di atas, jadi pengaman
-  // hanya untuk memuaskan tipe, bukan untuk menutup kasus nyata.
   return gaya ?? { ikon: 'notifications', token: 'bw-ink-2' as TokenWarna };
 };
 
@@ -46,6 +32,8 @@ export interface KotakNotifikasiProps {
   onBukaJadwal: (jadwalId: string) => void;
   onTandaiDibaca: (id: string) => void;
   onTandaiSemuaDibaca: () => void;
+  onHapusSemua: () => void;
+  onHapus: (id: string) => void;
   onCobaLagi: () => void;
 }
 
@@ -59,29 +47,46 @@ export function KotakNotifikasi({
   onBukaJadwal,
   onTandaiDibaca,
   onTandaiSemuaDibaca,
+  onHapusSemua,
+  onHapus,
   onCobaLagi,
 }: KotakNotifikasiProps) {
+  const insets = useSafeAreaInsets();
+  
+  // Menggunakan custom hook gesek berbasis Reanimated & Gesture Handler
+  const { panGesture, gayaKartu, gayaBackdrop, tutupDenganAnimasi } = useGesekTutup(
+    terbuka,
+    onTutup
+  );
+
   return (
     <Modal
       visible={terbuka}
-      animationType="slide"
+      animationType="none" // None agar tidak bentrok dengan Reanimated
       transparent
       statusBarTranslucent
-      onRequestClose={onTutup}
+      onRequestClose={tutupDenganAnimasi}
     >
-      <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <Pressable accessible={false} className="flex-1" onPress={onTutup} />
+      <Animated.View className="flex-1 justify-end" style={gayaBackdrop}>
+        {/* area luar sheet untuk menutup modal saat diketuk */}
+        <Pressable accessible={false} className="flex-1" onPress={tutupDenganAnimasi} />
 
-        <View className="max-h-[88%] rounded-t-[32px] border border-bw-line bg-bw-card">
-          {/* Pegangan */}
-          <View className="items-center pt-2.5">
-            <View className="h-1.5 w-10 rounded-full bg-bw-line" />
-          </View>
+        {/* Sheet container yang dapat digesek */}
+        <Animated.View
+          className="max-h-[88%] rounded-t-[32px] border border-b-0 border-bw-line bg-bw-card shadow-2xl"
+          style={gayaKartu}
+        >
+          {/* Handlebar sebagai area utama pemicu gesek */}
+          <GestureDetector gesture={panGesture}>
+            <View className="items-center pb-2 pt-3 w-full">
+              <View className="h-1.5 w-12 rounded-full bg-bw-line/80" />
+            </View>
+          </GestureDetector>
 
-          {/* Kepala */}
-          <View className="flex-row items-center gap-3 px-5 pb-3 pt-3">
+          {/* Kepala Sheet */}
+          <View className="flex-row items-center gap-3 px-5 pb-3 pt-1">
             <View className="min-w-0 flex-1">
-              <Text className="text-xl font-extrabold tracking-tight text-bw-ink">
+              <Text className="text-md font-extrabold tracking-tight text-bw-ink">
                 Notifikasi
               </Text>
               <Text className="mt-0.5 text-xs text-bw-muted">
@@ -96,16 +101,41 @@ export function KotakNotifikasi({
                 onPress={onTandaiSemuaDibaca}
                 accessibilityRole="button"
                 accessibilityLabel="Tandai semua sudah dibaca"
+                android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
                 className="rounded-full bg-bw-blue-50 px-3 py-2 active:opacity-70"
               >
                 <Text className="text-xs font-bold text-bw-blue">Tandai semua</Text>
               </Pressable>
             ) : null}
+
+            {notifikasi.length > 0 ? (
+              <Pressable
+                onPress={onHapusSemua}
+                accessibilityRole="button"
+                accessibilityLabel="Hapus semua notifikasi"
+                accessibilityHint="Menghapus seluruh notifikasi secara permanen"
+                android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
+                className="flex-row items-center gap-1 rounded-full bg-bw-red-50 px-3 py-2 active:opacity-70"
+              >
+                <Ikon nama="trash-outline" token="bw-red" ukuran={14} />
+                <Text className="text-xs font-bold text-bw-red">Hapus semua</Text>
+              </Pressable>
+            ) : null}
+
+            {/* Tombol Tutup Khusus */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tutup notifikasi"
+              onPress={tutupDenganAnimasi}
+              hitSlop={8}
+              android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
+              className="h-9 w-9 items-center justify-center rounded-full bg-bw-surface active:opacity-70"
+            >
+              <Ikon nama="close" token="bw-ink-2" ukuran={18} />
+            </Pressable>
           </View>
 
-          {/* Galat ditampilkan apa adanya, lalu diberi jalan keluar. Pola yang sama
-              dipakai layar Jadwal dan Tugas, supaya galat di aplikasi ini selalu
-              kelihatan dengan cara yang sama. */}
+          {/* Alert Galat */}
           {galat ? (
             <View
               accessibilityRole="alert"
@@ -129,6 +159,7 @@ export function KotakNotifikasi({
             </View>
           ) : null}
 
+          {/* Loading & Empty State */}
           {memuat && notifikasi.length === 0 ? (
             <View className="items-center px-5 py-14">
               <Text className="text-sm text-bw-muted">Memuat notifikasi...</Text>
@@ -147,11 +178,15 @@ export function KotakNotifikasi({
               </Text>
             </View>
           ) : (
+            /* Daftar Notifikasi */
             <FlatList
               data={notifikasi}
               keyExtractor={(item) => item.id}
               className="grow-0"
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingBottom: Math.max(insets.bottom, 24),
+              }}
               ItemSeparatorComponent={() => (
                 <View className="h-px bg-bw-line" />
               )}
@@ -159,75 +194,79 @@ export function KotakNotifikasi({
                 const gaya = gayaKategori(item.kategori);
 
                 return (
-                  <Pressable
-                    onPress={() => {
-                      onTandaiDibaca(item.id);
-                      if (item.jadwalId) onBukaJadwal(item.jadwalId);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      item.dibaca ? item.judul : `${item.judul}, belum dibaca`
-                    }
-                    accessibilityHint={
-                      item.jadwalId ? 'Buka jadwalnya' : 'Tandai sudah dibaca'
-                    }
-                    className="flex-row gap-3 py-3.5 active:opacity-60"
-                  >
-                    {/* Titik belum dibaca */}
-                    <View className="w-2.5 items-center pt-1.5">
-                      <View
-                        className={`h-2 w-2 rounded-full ${
-                          item.dibaca ? 'bg-transparent' : 'bg-bw-blue'
-                        }`}
-                      />
-                    </View>
-
-                    <View
-                      className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        item.dibaca ? 'bg-bw-surface' : 'bg-bw-blue-50'
-                      }`}
+                  <View className="flex-row items-stretch">
+                    <Pressable
+                      onPress={() => {
+                        onTandaiDibaca(item.id);
+                        if (item.jadwalId) onBukaJadwal(item.jadwalId);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        item.dibaca ? item.judul : `${item.judul}, belum dibaca`
+                      }
+                      accessibilityHint={
+                        item.jadwalId ? 'Buka jadwalnya' : 'Tandai sudah dibaca'
+                      }
+                      android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
+                      className="min-w-0 flex-1 flex-row gap-3 py-3.5 pr-1 active:opacity-60"
                     >
-                      <Ikon
-                        nama={gaya.ikon}
-                        token={item.dibaca ? 'bw-muted' : gaya.token}
-                        ukuran={19}
-                      />
-                    </View>
+                      {/* Status Belum Dibaca */}
+                      <View className="w-2.5 items-center pt-1.5">
+                        <View
+                          className={`h-2 w-2 rounded-full ${
+                            item.dibaca ? 'bg-transparent' : 'bg-bw-blue'
+                          }`}
+                        />
+                      </View>
 
-                    <View className="min-w-0 flex-1">
-                      <Text
-                        numberOfLines={2}
-                        className={
-                          item.dibaca
-                            ? 'text-sm leading-snug text-bw-muted'
-                            : 'text-sm font-bold leading-snug text-bw-ink'
-                        }
+                      {/* Ikon Kategori */}
+                      <View
+                        className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          item.dibaca ? 'bg-bw-surface' : 'bg-bw-blue-50'
+                        }`}
                       >
-                        {item.judul}
-                      </Text>
+                        <Ikon
+                          nama={gaya.ikon}
+                          token={item.dibaca ? 'bw-muted' : gaya.token}
+                          ukuran={19}
+                        />
+                      </View>
 
-                      {item.pesan ? (
+                      {/* Konten Teks */}
+                      <View className="min-w-0 flex-1">
                         <Text
+                          className={`text-sm leading-tight text-bw-ink ${
+                            item.dibaca ? 'font-normal text-bw-muted' : 'font-semibold'
+                          }`}
                           numberOfLines={2}
-                          className="mt-0.5 text-xs leading-relaxed text-bw-muted"
                         >
-                          {item.pesan}
+                          {item.judul}
                         </Text>
-                      ) : null}
-
-                      {item.dibuatPada ? (
-                        <Text className="mt-1 text-[11px] text-bw-muted">
+                        <Text className="mt-1 text-xs text-bw-muted">
                           {formatWaktuLengkap(item.dibuatPada)}
                         </Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
+                      </View>
+                    </Pressable>
+
+                    {/* Hapus notifikasi */}
+                    <Pressable
+                      onPress={() => onHapus(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Hapus notifikasi: ${item.judul}`}
+                      accessibilityHint="Menghapus notifikasi ini secara permanen"
+                      hitSlop={6}
+                      android_ripple={{ color: 'rgba(0,0,0,0.05)', borderless: true }}
+                      className="w-9 shrink-0 items-center justify-center active:opacity-70"
+                    >
+                      <Ikon nama="trash-outline" token="bw-muted" ukuran={17} />
+                    </Pressable>
+                  </View>
                 );
               }}
             />
           )}
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }

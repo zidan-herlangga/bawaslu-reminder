@@ -20,7 +20,7 @@ import {
 } from '../lib/sound';
 import { showToast, subscribeToast } from '../lib/toast';
 
-const APP_PATHS = ['/', '/kalender', '/todo', '/jadwal/baru', '/akun'];
+const APP_PATHS = ['/', '/kalender', '/tugas', '/jadwal/baru', '/akun'];
 // Kanal realtime menarik notifikasi begitu baris masuk. Polling di bawah tetap
 // ada sebagai jaring pengaman; barunya baru dipakai setelah kanal terbukti
 // benar-benar mengantarkan event, supaya tidak pernah lebih lambat dari sekarang.
@@ -102,6 +102,14 @@ function IconClose({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+function IconTrash({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5h13.5M9.75 7.5V5.25a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5V7.5m-7.5 0 1.05 11.65A1.5 1.5 0 0 0 8.202 20.64h7.596a1.5 1.5 0 0 0 1.49-1.49L18.338 7.5M10 11.25v5.25M14 11.25v5.25" />
     </svg>
   );
 }
@@ -188,6 +196,7 @@ export default function AppShell() {
   const onlineRef = useRef(online);
 
   const seenRef = useRef(new Set());
+  const maxSeenRef = useRef(0);
   const silencedRef = useRef(new Set());
   const primedRef = useRef(false);
 
@@ -222,10 +231,26 @@ export default function AppShell() {
     } else {
       setNotifError('');
       const rows = data ?? [];
+
+      // Baris di kotak masuk selalu terurut dari yang terbaru, dan baris baru
+      // selalu mendarat di atas. Notifikasi hanya benar-benar baru kalau dibuat
+      // setelah created_at paling baru yang pernah dimuat. Membandingkan id saja
+      // tidak cukup: saat sebuah baris dihapus, baris lama dari luar jendela 30
+      // teratas ikut naik dan id-nya belum pernah terlihat, sehingga disangka
+      // kabar baru, berbunyi, dan pengguna merasa notifikasinya justru berlipat.
       const fresh = primedRef.current
-        ? rows.filter((item) => !seenRef.current.has(item.id))
+        ? rows.filter((item) => {
+            const t = Date.parse(item.created_at);
+            return Number.isFinite(t) && t > maxSeenRef.current;
+          })
         : [];
 
+      let maks = maxSeenRef.current;
+      for (const row of rows) {
+        const t = Date.parse(row.created_at);
+        if (Number.isFinite(t) && t > maks) maks = t;
+      }
+      maxSeenRef.current = maks;
       seenRef.current = new Set(rows.map((item) => item.id));
       primedRef.current = true;
       setNotifs(rows);
@@ -261,6 +286,7 @@ export default function AppShell() {
       setNotifOpen(false);
       primedRef.current = false;
       seenRef.current = new Set();
+      maxSeenRef.current = 0;
       silencedRef.current = new Set();
       return undefined;
     }
@@ -293,7 +319,7 @@ export default function AppShell() {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
           filter: `penerima_id=eq.${userId}`,
@@ -398,6 +424,44 @@ export default function AppShell() {
     if (error || !data?.length) setNotifs(previous);
   };
 
+  const deleteNotif = async (id) => {
+    const previous = notifs;
+    setNotifs((list) => list.filter((item) => item.id !== id));
+    const { data, error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error || !data?.length) {
+      console.error('[AppShell] notifikasi gagal dihapus:', error?.message ?? 'tidak ada yang terhapus');
+      setNotifError(
+        error?.message?.includes('schema cache') || error?.message?.includes('Could not find')
+          ? 'Jalankan supabase/schema.sql (bagian 7) di SQL Editor Supabase.'
+          : error?.message ?? 'Notifikasi tidak terhapus. Coba lagi.'
+      );
+      setNotifs(previous);
+    }
+  };
+
+  const deleteAllNotifs = async () => {
+    if (notifs.length === 0) return;
+    const previous = notifs;
+    setNotifs([]);
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('penerima_id', userId);
+    if (error) {
+      console.error('[AppShell] notifikasi gagal dihapus semua:', error.message);
+      setNotifError(
+        error.message.includes('schema cache') || error.message.includes('Could not find')
+          ? 'Jalankan supabase/schema.sql (bagian 7) di SQL Editor Supabase.'
+          : error.message
+      );
+      setNotifs(previous);
+    }
+  };
+
   const handleEnablePush = async () => {
     if (pushBusy) return;
     setPushBusy(true);
@@ -427,7 +491,7 @@ export default function AppShell() {
     { to: '/', label: 'Beranda', icon: IconHome, end: true },
     { to: '/kalender', label: 'Kalender', icon: IconCalendar, end: false },
     { to: '/jadwal/baru', label: 'Buat Jadwal', short: 'Buat', icon: IconPlus, end: false },
-    { to: '/todo', label: 'Todo', icon: IconChecklist, end: false },
+    { to: '/tugas', label: 'Tugas', icon: IconChecklist, end: false },
     { to: '/akun', label: 'Akun', icon: IconUser, end: false },
   ];
 
@@ -542,6 +606,18 @@ export default function AppShell() {
                   Notifikasi {unread > 0 && <span className="text-bw-red">({unread})</span>}
                 </p>
                 <div className="flex items-center gap-2">
+                  {notifs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={deleteAllNotifs}
+                      aria-label="Hapus semua notifikasi"
+                      title="Hapus semua notifikasi"
+                      className="flex items-center gap-1 text-xs font-semibold text-bw-red transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-bw-red/40"
+                    >
+                      <IconTrash className="h-3.5 w-3.5" />
+                      Hapus semua
+                    </button>
+                  )}
                   {unread > 0 && (
                     <button
                       type="button"
@@ -585,13 +661,13 @@ export default function AppShell() {
                 {!notifError && notifs.length > 0 && (
                   <ul className="divide-y divide-bw-line">
                     {notifs.map((item) => (
-                      <li key={item.id}>
+                      <li key={item.id} className="flex items-stretch">
                         <button
                           type="button"
                           onClick={() => {
                             if (!item.dibaca) markRead(item.id);
                           }}
-                          className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-bw-blue/40 ${
+                          className={`flex min-w-0 flex-1 items-start gap-2.5 px-3 py-2.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-bw-blue/40 ${
                             item.dibaca ? '' : 'bg-bw-blue-50/60 hover:bg-bw-blue-50'
                           }`}
                         >
@@ -615,6 +691,17 @@ export default function AppShell() {
                               {formatLalu(item.created_at)}
                             </span>
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void deleteNotif(item.id);
+                          }}
+                          aria-label={`Hapus notifikasi ${item.judul}`}
+                          title="Hapus notifikasi"
+                          className="grid w-11 shrink-0 place-items-center text-bw-muted transition-colors hover:bg-bw-red-50 hover:text-bw-red focus:outline-none focus:ring-2 focus:ring-inset focus:ring-bw-red/40"
+                        >
+                          <IconTrash className="h-4 w-4" />
                         </button>
                       </li>
                     ))}
@@ -648,7 +735,7 @@ export default function AppShell() {
         {!online && (
           <div
             role="status"
-            className="flex shrink-0 items-center gap-2.5 border-b border-bw-amber-100 bg-bw-amber-50 px-4 py-2.5 text-xs font-medium text-bw-amber sm:px-5"
+            className="flex shrink-0 items-center gap-2.5 border-b border-bw-amber-200 bg-bw-amber-50 px-4 py-2.5 text-xs font-medium text-bw-amber-800 sm:px-5"
           >
             <svg
               className="h-4 w-4 shrink-0"
@@ -677,26 +764,19 @@ export default function AppShell() {
             showNav ? 'pb-28 pt-4' : 'py-6'
           }`}
         >
-          {session && soundOn && !soundAktif && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-bw-blue-200 bg-bw-blue-50 px-3.5 py-3">
-              <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-bw-blue"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-                />
-              </svg>
-              <p className="min-w-0 flex-1 text-[13px] leading-snug text-bw-blue-900">
-                <span className="font-bold">Ketuk layar sekali</span> agar nada pengingat berbunyi.
-                Browser memblokir suara otomatis sampai kamu berinteraksi di halaman ini.
+          {/* Automatic Sound */}
+          {soundAktif && !soundOn && (
+            <div className="mb-4 rounded-3xl border border-bw-line bg-bw-card p-4 text-center text-sm font-medium text-bw-ink shadow-card">
+              <p className="mb-2">
+                Suara pengingat masih dimatikan. Aktifkan supaya nada pengingat terdengar.
               </p>
+              <button
+                type="button"
+                onClick={() => setSoundOn(true)}
+                className="rounded-lg bg-bw-blue px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40 focus:ring-offset-bw-canvas"
+              >
+                Aktifkan Suara
+              </button>
             </div>
           )}
 
