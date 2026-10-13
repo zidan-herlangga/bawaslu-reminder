@@ -239,6 +239,41 @@ export async function notifyNow({ title, body, tag, url = '/' }) {
   }
 }
 
+export async function sendTodoNotify(todoId, session) {
+  // Objek session di memori bisa berisi access token yang sudah kedaluwarsa,
+  // terutama di PWA yang dibiarkan terbuka lama. Baca sesi terbaru dulu supaya
+  // tidak kena 401 sesaat yang hanya muncul di kondisi tertentu.
+  let token = session?.access_token;
+  try {
+    const { data } = await supabase.auth.getSession();
+    token = data?.session?.access_token ?? token;
+  } catch (error) {
+    console.warn('[push] gagal memperbarui sesi, pakai token lama:', error?.message);
+  }
+  if (!token) return { ok: false, reason: 'no-session' };
+
+  const response = await fetch('/api/notify-tugas', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ todoId }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(
+        'Endpoint /api/notify-tugas tidak ditemukan. Deploy api/ terbaru belum selesai.'
+      );
+    }
+    throw new Error(data.error || `Permintaan gagal (HTTP ${response.status}).`);
+  }
+  return { ok: true, reason: 'sent', detail: data };
+}
+
 export async function sendRemind(scheduleId, session) {
   // Objek session di memori bisa berisi access token yang sudah kedaluwarsa,
   // terutama di PWA yang dibiarkan terbuka lama. Baca sesi terbaru dulu supaya

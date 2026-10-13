@@ -180,6 +180,8 @@ export async function kirimPengingat(admin, { jadwal, pengirimId, waktu, lewatiS
     return {
       terkirim: penerima.length,
       push: 0,
+      pushWeb: 0,
+      pushNative: 0,
       pesan,
       catatan: `Notifikasi tersimpan, tetapi langganan push gagal dibaca: ${subError.message}`,
     };
@@ -205,6 +207,8 @@ export async function kirimPengingat(admin, { jadwal, pengirimId, waktu, lewatiS
     return {
       terkirim: penerima.length,
       push: 0,
+      pushWeb: 0,
+      pushNative: 0,
       pesan,
       catatan: 'Belum ada penerima yang mengaktifkan notifikasi.',
     };
@@ -256,6 +260,7 @@ export async function kirimPengingat(admin, { jadwal, pengirimId, waktu, lewatiS
   // kredensial push native belum diisi, tahap ini dilewati diam-diam supaya
   // notifikasi ke pengguna web tetap jalan.
   let pushNative = 0;
+  let nativeKedaluwarsa = 0;
   const catatanNative = [];
 
   const siapAndroid = pushNativeSiap();
@@ -283,6 +288,7 @@ export async function kirimPengingat(admin, { jadwal, pengirimId, waktu, lewatiS
 
     pushNative = hasilNative.terkirim;
 
+    nativeKedaluwarsa = hasilNative.kedaluwarsa.length;
     if (hasilNative.kedaluwarsa.length > 0) {
       await admin.from('device_tokens').delete().in('token', hasilNative.kedaluwarsa);
     }
@@ -292,20 +298,145 @@ export async function kirimPengingat(admin, { jadwal, pengirimId, waktu, lewatiS
     }
   } else if (daftarPerangkat.length > 0) {
     catatanNative.push(
-      'Token perangkat sudah terdaftar, tetapi kredensial push native belum diisi.'
+      siapAndroid || siapApple
+        ? 'Token perangkat ada, tetapi tidak ada kredensial push yang cocok dengan platformnya.'
+        : 'Kredensial push native belum diisi di server.'
     );
   }
 
   const totalPerangkat = daftarWeb.length + daftarPerangkat.length;
   const totalTerkirim = pushWeb + pushNative;
+  const jumlahDibersihkan = expired.length + nativeKedaluwarsa;
   const catatan = [
     totalTerkirim < totalPerangkat
-      ? `${totalPerangkat - totalTerkirim} perangkat tidak bisa dijangkau dan sudah dibersihkan.`
+      ? `${totalPerangkat - totalTerkirim} perangkat tidak bisa dijangkau.`
       : '',
+    jumlahDibersihkan > 0 ? `${jumlahDibersihkan} token mati sudah dibersihkan.` : '',
     ...catatanNative,
   ]
     .filter(Boolean)
     .join(' ');
 
   return { terkirim: penerima.length, push: totalTerkirim, pushWeb, pushNative, pesan, catatan };
+}
+
+/**
+ * Kirim notifikasi ke SELURUH perangkat satu penerima (langganan web + token
+ * native), lalu bersihkan token/endpoint yang sudah mati.
+ *
+ * Dipakai untuk hal yang tidak punya jadwal, misalnya "Tugas baru" yang dibuat
+ * di web untuk mengingatkan pemiliknya di perangkat lain. Jangan dipakai yang
+ * butuh banyak penerima; pakai kirimPengingat().
+ */
+export async function kirimKePenerima(
+  admin,
+  { penerimaId, judul, pesan, kategori, kotakId = null, data = {} }
+) {
+  const hasil = { terkirim: 0, pushWeb: 0, pushNative: 0, alasan: [] };
+  const label = notifikasiUntuk(kategori);
+  const tag = `${label.tag}-${kotakId ?? penerimaId}`;
+
+  const { data: subscriptions, error: subError } = await admin
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth')
+    .eq('user_id', penerimaId);
+  if (subError) {
+    hasil.alasan.push(`Langganan push gagal dibaca: ${subError.message}`);
+  }
+  const daftarWeb = subscriptions ?? [];
+
+  const { data: devices, error: deviceError } = await admin
+    .from('device_tokens')
+    .select('token, platform')
+    .eq('user_id', penerimaId);
+  if (deviceError) {
+    hasil.alasan.push(`Token perangkat gagal dibaca: ${deviceError.message}`);
+  }
+  const daftarPerangkat = devices ?? [];
+
+  if (daftarWeb.length === 0 && daftarPerangkat.length === 0) {
+    hasil.alasan.push('Belum ada perangkat yang terdaftar untuk akun ini.');
+    return hasil;
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@bawaslu.go.id',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+
+  const expiredWeb = [];
+  const results = daftarWeb.length
+    ? await Promise.allSettled(
+        daftarWeb.map((item) => {
+          const payload = JSON.stringify({
+            title: judul,
+            body: pesan,
+            url: '/',
+            id: kotakId,
+            kategori,
+            tag,
+          });
+
+          return webpush
+            .sendNotification(
+              {
+                endpoint: item.endpoint,
+                keys: { p256dh: item.p256dh, auth: item.auth },
+              },
+              payload
+            )
+            .catch((error) => {
+              const status = error?.statusCode;
+              if (status === 404 || status === 410) expiredWeb.push(item.endpoint);
+              throw error;
+            });
+        })
+      )
+    : [];
+
+  if (expiredWeb.length > 0) {
+    await admin.from('push_subscriptions').delete().in('endpoint', expiredWeb);
+  }
+
+  hasil.pushWeb = results.filter((item) => item.status === 'fulfilled').length;
+
+  const siapAndroid = pushNativeSiap();
+  const siapApple = apnsSiap();
+  const adaAndroid = daftarPerangkat.some((item) => item.platform === 'android');
+  const adaIos = daftarPerangkat.some((item) => item.platform === 'ios');
+  const perluAndroid = adaAndroid && siapAndroid;
+  const perluIos = adaIos && siapApple;
+
+  if (daftarPerangkat.length > 0 && (perluAndroid || perluIos)) {
+    const yangDikirim = daftarPerangkat.filter((item) =>
+      item.platform === 'ios' ? perluIos : perluAndroid
+    );
+
+    const hasilNative = await kirimKeNative(yangDikirim, {
+      title: judul,
+      body: pesan,
+      tag,
+      data: { ...data, kategori },
+    });
+
+    hasil.pushNative = hasilNative.terkirim;
+
+    if (hasilNative.kedaluwarsa.length > 0) {
+      await admin.from('device_tokens').delete().in('token', hasilNative.kedaluwarsa);
+    }
+
+    if (hasilNative.alasan.length > 0) {
+      hasil.alasan.push(...hasilNative.alasan);
+    }
+  } else if (daftarPerangkat.length > 0) {
+    hasil.alasan.push(
+      siapAndroid || siapApple
+        ? 'Token perangkat ada, tetapi tidak ada kredensial push yang cocok dengan platformnya.'
+        : 'Kredensial push native belum diisi di server.'
+    );
+  }
+
+  hasil.terkirim = hasil.pushWeb + hasil.pushNative;
+  return hasil;
 }

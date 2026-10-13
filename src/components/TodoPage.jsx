@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { sendTodoNotify } from '../lib/push';
 import useSession from '../hooks/useSession';
 
 const COLUMNS = 'id, teks, tanggal, selesai, created_at';
@@ -129,7 +130,16 @@ export default function TodoPage() {
 
     setListError('');
     setDraft('');
-    if (data?.[0]) setTodos((previous) => [data[0], ...previous]);
+    if (data?.[0]) {
+      setTodos((previous) => [data[0], ...previous]);
+
+      // Kirim notifikasi "tugas baru" ke perangkat pemilik (APK/HP dan browser),
+      // tanpa memblokir penyimpanan. Gagal mengirim tidak boleh menggagalkan
+      // tugas yang sudah tersimpan.
+      void sendTodoNotify(data[0].id, session).catch((error) =>
+        console.warn('[Todo] notifikasi tugas gagal dikirim:', error?.message ?? error)
+      );
+    }
   };
 
   const startEdit = (todo) => {

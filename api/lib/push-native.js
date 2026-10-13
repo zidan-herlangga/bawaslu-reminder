@@ -55,16 +55,41 @@ function base64url(input) {
 }
 
 // Channel Android dipilih per kategori, sama seperti nada per kategori yang
-// dibundel aplikasi (mobile/assets/sounds + res/raw). Kategori asing atau yang
-// tidak dikenal memakai channel bawaan 'pengingat-jadwal'.
+// dibundel aplikasi (android/app/src/main/res/raw). Kategori asing atau yang
+// tidak dikenal memakai channel bawaan 'pengingat-jadwal-v2'. Akhiran -v2
+// harus sama persis dengan kanal di lib/layanan/notifikasi.dart (Flutter);
+// versinya dinaikkan ketika kategori mendapat suara kustom supaya kanal lama
+// yang "biasa" tidak menimpa pengaturan yang baru.
 const KANAL_PER_KATEGORI = {
-  Rapat: 'pengingat-rapat',
-  Tugas: 'pengingat-tugas',
-  Pengawasan: 'pengingat-pengawasan',
+  Rapat: 'pengingat-rapat-v2',
+  Tugas: 'pengingat-tugas-v2',
+  Pengawasan: 'pengingat-pengawasan-v2',
 };
 
+const KANAL_BAWAAN = 'pengingat-jadwal-v2';
+
 function kanalAndroidUntuk(kategori) {
-  return KANAL_PER_KATEGORI[String(kategori ?? '').trim()] || 'pengingat-jadwal';
+  return KANAL_PER_KATEGORI[String(kategori ?? '').trim()] || KANAL_BAWAAN;
+}
+
+// Ikon warna per kategori, persis yang dipakai web di public/. Dipakai sebagai
+// `image` notifikasi FCM supaya notifikasi yang muncul saat aplikasi tertutup
+// ikut memakai ikon kategori, bukan hanya yang tampil saat aplikasi terbuka.
+const IKON_PER_KATEGORI = {
+  Rapat: '/icon-rapat-192.png',
+  Tugas: '/icon-tugas-192.png',
+  Pengawasan: '/icon-pengawasan-192.png',
+};
+
+const IKON_BAWAAN = '/icon-192.png';
+
+function ikonUntuk(kategori) {
+  return IKON_PER_KATEGORI[String(kategori ?? '').trim()] || IKON_BAWAAN;
+}
+
+/** Asal URL ikon publik; boleh ditimpa dengan env PUBLIC_ORIGIN. */
+function asalPublik() {
+  return process.env.PUBLIC_ORIGIN || 'https://bawasagenda.vercel.app';
 }
 
 // ------------------------------------------------------------- Google FCM
@@ -137,6 +162,10 @@ async function kirimFCM(tokenPerangkat, muatan) {
             priority: 'high',
             notification: {
               channel_id: kanalAndroidUntuk(muatan.data?.kategori),
+              // Ikon kategori ikut dikirim supaya notifikasi yang muncul saat
+              // aplikasi tertutup tampil berbeda antar kategori (kanal mengatur
+              // suara dan getaran, `image` mengatur ikon warnanya).
+              image: `${asalPublik()}${ikonUntuk(muatan.data?.kategori)}`,
               // Tag membuat notifikasi kategori yang sama saling menggantikan,
               // bukan menumpuk di panel.
               tag: muatan.tag,

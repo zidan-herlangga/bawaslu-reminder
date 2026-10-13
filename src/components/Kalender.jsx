@@ -141,10 +141,12 @@ export default function Kalender() {
     try {
       const result = await sendRemind(schedule.id, session);
       const catatan = result.catatan ? ` ${result.catatan}` : '';
+      const pushWeb = result.pushWeb ?? 0;
+      const pushNative = result.pushNative ?? 0;
       setRemind({
         id: schedule.id,
         status: 'ok',
-        message: `Pengingat terkirim ke ${result.terkirim} penerima, ${result.push} notifikasi browser.${catatan}`,
+        message: `Pengingat terkirim ke ${result.terkirim} penerima (${pushWeb} notifikasi browser, ${pushNative} notifikasi perangkat).${catatan}`,
       });
 
       const slots = sortSlots(getSlots(schedule));

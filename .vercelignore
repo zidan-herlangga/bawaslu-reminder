@@ -17,6 +17,10 @@ mobile/android
 mobile/ios
 mobile/.expo
 
+# Aplikasi Flutter (staff_reminder): hasil build APK dan Gradle ratusan MB
+# sampai beberapa GB; bukan bagian dari deployment web.
+staff_reminder
+
 # Berkas berisi rahasia atau identitas yang tidak boleh berada di server web.
 .env
 .env.*
@@ -39,3 +43,5 @@ logs
 .idea
 .DS_Store
 downloads
+dokumen
+.playwright-mcp
