@@ -149,6 +149,20 @@ class _LayarMasukState extends State<LayarMasuk> {
                     onPress: _memuat ? null : _masuk,
                     child: Text(_memuat ? 'Memproses...' : 'Masuk'),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Belum punya akun?',
+                        style: TextStyle(color: Warna.muted, fontSize: 13),
+                      ),
+                      TextButton(
+                        onPressed: _memuat ? null : () => context.go('/daftar'),
+                        child: const Text('Daftar di sini'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../config/env.dart';
 import '../layar/akun.dart';
 import '../layar/beranda.dart';
+import '../layar/daftar.dart';
 import '../layar/jadwal_baru.dart';
 import '../layar/jadwal_detail.dart';
 import '../layar/kalender.dart';
@@ -25,13 +26,16 @@ final class RouterApp {
     initialLocation: '/',
     redirect: (context, state) {
       if (!Env.adaSupabase) return null;
-      final diMasuk = state.matchedLocation == '/masuk';
-      if (!Auth.sudahMasuk && !diMasuk) return '/masuk';
-      if (Auth.sudahMasuk && diMasuk) return '/';
+      final lokasi = state.matchedLocation;
+      // Rute yang boleh dibuka tanpa sesi: masuk dan daftar.
+      final rutePublik = lokasi == '/masuk' || lokasi == '/daftar';
+      if (!Auth.sudahMasuk && !rutePublik) return '/masuk';
+      if (Auth.sudahMasuk && rutePublik) return '/';
       return null;
     },
     routes: [
       GoRoute(path: '/masuk', builder: (context, state) => const LayarMasuk()),
+      GoRoute(path: '/daftar', builder: (context, state) => const LayarDaftar()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => KerangkaTab(shell: shell),
         branches: [
