@@ -18,6 +18,10 @@ dist-ssr
 # masuk riwayat git.
 google-services.json
 
+# Konfigurasi aplikasi iOS di Firebase (berisi id project, bukan rahasia rahasia).
+# Unduh dari Firebase Console lalu simpan di staff_reminder/ios/Runner/.
+GoogleService-Info.plist
+
 logs
 *.log
 npm-debug.log*
