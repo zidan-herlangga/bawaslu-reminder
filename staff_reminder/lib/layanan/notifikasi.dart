@@ -108,7 +108,7 @@ class Notifikasi {
     final pembuka = await FirebaseMessaging.instance.getInitialMessage();
     if (pembuka != null) _bukaDariPesan(pembuka);
 
-    FirebaseMessaging.instance.onTokenRefresh.listen(_kirimToken);
+    FirebaseMessaging.instance.onTokenRefresh.listen((_) => _kirimToken());
 
     _pantauSesi();
   }
@@ -233,7 +233,7 @@ class Notifikasi {
     });
   }
 
-  static Future<void> _kirimToken([String? token]) async {
+  static Future<void> _kirimToken() async {
     if (!_aktif) return;
 
     final klien = supabase;
@@ -241,13 +241,13 @@ class Notifikasi {
     if (klien == null || pengguna == null) return;
 
     try {
-      final fcm = token ?? await FirebaseMessaging.instance.getToken();
-      if (fcm == null) return;
+      final perangkat = await _tokenPerangkat();
+      if (perangkat == null) return;
 
       await klien.from('device_tokens').upsert(
         {
           'user_id': pengguna.id,
-          'token': fcm,
+          'token': perangkat,
           'platform': Platform.isIOS ? 'ios' : 'android',
         },
         onConflict: 'token',
@@ -256,6 +256,24 @@ class Notifikasi {
       // Jaringan/RLS bermasalah: pendaftaran token akan dicoba lagi saat
       // token disegarkan atau sesi berikutnya.
     }
+  }
+
+  /// Token yang dipakai server untuk mengirim push ke perangkat ini.
+  ///
+  /// Server mengirim Android lewat FCM dan iOS langsung ke APNs (lihat
+  /// `api/lib/push-native.js`), jadi nilai yang disimpan pun berbeda: Android
+  /// memakai FCM token, iOS memakai APNs device token. APNs token kadang belum
+  /// siap tepat setelah aplikasi mulai, jadi dicoba beberapa kali dulu.
+  static Future<String?> _tokenPerangkat() async {
+    final fcm = FirebaseMessaging.instance;
+    if (!Platform.isIOS) return fcm.getToken();
+
+    for (var percobaan = 0; percobaan < 10; percobaan++) {
+      final apns = await fcm.getAPNSToken();
+      if (apns != null) return apns;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    return null;
   }
 
   /// Hapus token milik pengguna saat ini. Harus dipanggil SEBELUM `signOut()`
@@ -267,9 +285,9 @@ class Notifikasi {
     if (klien == null) return;
 
     try {
-      final fcm = await FirebaseMessaging.instance.getToken();
-      if (fcm == null) return;
-      await klien.from('device_tokens').delete().eq('token', fcm);
+      final perangkat = await _tokenPerangkat();
+      if (perangkat == null) return;
+      await klien.from('device_tokens').delete().eq('token', perangkat);
     } catch (_) {
       // Diamkan: batas terjauhnya token lama ikut dibersihkan saat gagal kirim.
     }
