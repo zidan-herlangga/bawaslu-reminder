@@ -8,6 +8,7 @@ import ConfirmDialog from './ConfirmDialog';
 import DetailJadwal from './DetailJadwal';
 import {
   getSlots,
+  jadwalSelesai,
   resolveAgenda,
   sesiSelesai,
   sortSlots,
@@ -24,6 +25,7 @@ import {
   formatWaktuLengkap,
 } from '../lib/formatWaktu';
 import { getHariLibur, labelJenis } from '../data/hariLibur';
+import { ensureHolidays, getLiburInfo } from '../lib/holidays';
 
 const TICK_MS = 30 * 1000;
 const BATAS_HASIL = 40;
@@ -116,6 +118,7 @@ export default function Kalender() {
   const [filterStatus, setFilterStatus] = useState('semua');
   const [filterDivisi, setFilterDivisi] = useState('');
   const [hanyaMilikSaya, setHanyaMilikSaya] = useState(false);
+  const [hariLiburDb, setHariLiburDb] = useState([]);
 
   useEffect(() => subscribeSoundBusy(setSoundBusy), []);
 
@@ -123,6 +126,17 @@ export default function Kalender() {
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let aktif = true;
+    const tahun = view.getFullYear();
+    ensureHolidays(tahun).then((data) => {
+      if (aktif) setHariLiburDb(data || []);
+    });
+    return () => {
+      aktif = false;
+    };
+  }, [view.getFullYear()]);
 
   const handleRemind = async (schedule) => {
     // api/notify.js menolak dengan 403 bila pengirim bukan pembuat jadwal,
@@ -237,16 +251,30 @@ export default function Kalender() {
 
   const liburBulan = useMemo(() => {
     const tahun = view.getFullYear();
-    const jumlahHari = new Date(tahun, view.getMonth() + 1, 0).getDate();
+    const bulan = view.getMonth();
     const hasil = [];
 
-    for (let hari = 1; hari <= jumlahHari; hari += 1) {
-      const libur = getHariLibur(ymd(new Date(tahun, view.getMonth(), hari)));
-      if (libur) hasil.push({ hari, ...libur });
+    hariLiburDb.forEach((libur) => {
+      const d = new Date(libur.tanggal + 'T00:00:00');
+      if (d.getFullYear() === tahun && d.getMonth() === bulan) {
+        hasil.push({
+          hari: d.getDate(),
+          nama: libur.keterangan,
+          jenis: libur.jenis === 'cuti_bersama' ? 'cuti' : 'nasional',
+        });
+      }
+    });
+
+    if (hasil.length === 0) {
+      const jumlahHari = new Date(tahun, bulan + 1, 0).getDate();
+      for (let hari = 1; hari <= jumlahHari; hari += 1) {
+        const libur = getHariLibur(ymd(new Date(tahun, bulan, hari)));
+        if (libur) hasil.push({ hari, ...libur });
+      }
     }
 
-    return hasil;
-  }, [view]);
+    return hasil.sort((a, b) => a.hari - b.hari);
+  }, [view, hariLiburDb]);
 
   const selectedDate = useMemo(() => {
     const [year, month, day] = selected.split('-').map(Number);
@@ -254,7 +282,7 @@ export default function Kalender() {
   }, [selected]);
 
   const selectedItems = schedulesByDay.get(selected) ?? [];
-  const liburSelected = getHariLibur(selected);
+  const liburSelected = getLiburInfo(hariLiburDb, selected) || getHariLibur(selected);
 
 // Baris kalender adalah pasangan { schedule, slot }. Satu jadwal bisa punya
   // beberapa sesi, jadi urutan dan badge mengikuti sesinya sendiri, bukan
@@ -424,7 +452,8 @@ export default function Kalender() {
             const count = schedulesByDay.get(key)?.length ?? 0;
             const isToday = key === todayKey;
             const isSelected = key === selected;
-            const libur = getHariLibur(key);
+            const liburDb = getLiburInfo(hariLiburDb, key);
+            const libur = liburDb || getHariLibur(key);
             const isMinggu = cell.getDay() === 0;
 
             let tone =
@@ -743,6 +772,7 @@ export default function Kalender() {
               const slots = sortSlots(getSlots(item));
               const totalSlots = slots.length;
               const isOwner = item.pembuat_id === session.user.id;
+              const jadwalSudahSelesaiSemua = jadwalSelesai(item, now);
                             const reminded = remind.id === item.id;
               const sending = reminded && remind.status === 'busy';
               const agenda = resolveAgenda(slots, now);
@@ -759,7 +789,7 @@ export default function Kalender() {
                 <li
                   key={`${item.id}-${slot.mulai}`}
                   className={`relative overflow-hidden rounded-3xl border border-bw-line bg-bw-card p-3.5 pl-5 shadow-card transition-all duration-200 hover:shadow-lift ${
-                    sudahLewat ? 'opacity-70' : ''
+                    sudahLewat && !isOwner ? 'opacity-70' : ''
                   }`}
                 >
                   <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${accent}`} />
@@ -872,7 +902,7 @@ export default function Kalender() {
                   </div>
 
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-bw-line pt-2.5">
-                    {isOwner ? (
+                    {isOwner && !jadwalSudahSelesaiSemua ? (
                       <button
                         type="button"
                         onClick={() => handleRemind(item)}
@@ -881,7 +911,7 @@ export default function Kalender() {
                       >
                         {sending ? 'Mengirim...' : 'Ingatkan'}
                       </button>
-                    ) : (
+                    ) : isOwner && jadwalSudahSelesaiSemua ? null : (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-bw-surface px-2.5 py-1 text-[11px] font-semibold text-bw-muted">
                         <svg
                           className="h-3 w-3"
@@ -911,13 +941,15 @@ export default function Kalender() {
 
                     {isOwner && (
                       <>
-                        <Link
-                          to={`/jadwal/${item.id}/edit`}
-                          aria-label={`Ubah jadwal ${item.judul}`}
-                          className="grid h-11 place-items-center rounded-xl border border-bw-line bg-bw-card px-4 text-sm font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
-                        >
-                          Ubah
-                        </Link>
+                        {!jadwalSudahSelesaiSemua && (
+                          <Link
+                            to={`/jadwal/${item.id}/edit`}
+                            aria-label={`Ubah jadwal ${item.judul}`}
+                            className="grid h-11 place-items-center rounded-xl border border-bw-line bg-bw-card px-4 text-sm font-bold text-bw-muted transition-colors hover:border-bw-blue-200 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
+                          >
+                            Ubah
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => setKonfirmasiHapus(item)}

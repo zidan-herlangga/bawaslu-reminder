@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { DIVISI_OPTIONS, KATEGORI_OPTIONS } from '../constants/options';
@@ -6,6 +6,19 @@ import useSession from '../hooks/useSession';
 import fetchProfile from '../lib/fetchProfile';
 import { getSlots } from '../lib/slots';
 import { showToast } from '../lib/toast';
+
+const DIVISI_LIST = [
+  'Ketua Bawaslu',
+  'Koordinator Divisi (Kordiv) SDM, Organisasi, dan Diklat',
+  'Koordinator Divisi (Kordiv) Pencegahan, Partisipasi Masyarakat, dan Hubungan Antar Lembaga (P2HM)',
+  'Koordinator Divisi (Kordiv) Penanganan Pelanggaran dan Data & Informasi (Datin)',
+  'Koordinator Divisi (Kordiv) Hukum dan Penyelesaian Sengketa',
+  'Kepala Sekretariat (Kaseks)',
+  'Bendahara / Pengelola Keuangan',
+  'Staf / Penata Kelola Pengawasan Pemilu',
+  'Analis Hukum / Analis Pengawasan',
+  'Staf Pengadministrasian Perkantoran / Umum',
+];
 
 const EMPTY_SLOT = { mulai: '', selesai: '' };
 
@@ -145,12 +158,18 @@ export default function ScheduleForm() {
   const [detailLoading, setDetailLoading] = useState(() => isEdit);
   const [detailError, setDetailError] = useState('');
 
+  const [divisiQuery, setDivisiQuery] = useState('');
+  const [divisiOpen, setDivisiOpen] = useState(false);
+  const divisiWrapRef = useRef(null);
+
   useEffect(() => {
     setForm(EMPTY_FORM);
     setErrors({});
     setFormError('');
     setDetailError('');
     setDetailLoading(Boolean(id));
+    setDivisiQuery('');
+    setDivisiOpen(false);
   }, [id]);
 
   useEffect(() => {
@@ -204,6 +223,12 @@ export default function ScheduleForm() {
                 }))
               : [{ ...EMPTY_SLOT }],
         });
+        if (data.target_divisi) {
+          setDivisiQuery(data.target_divisi);
+        } else {
+          setDivisiQuery('');
+        }
+        setDivisiOpen(false);
       }
 
       setDetailLoading(false);
@@ -260,20 +285,69 @@ export default function ScheduleForm() {
     setErrors(stripSlotErrors);
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (divisiWrapRef.current && !divisiWrapRef.current.contains(event.target)) {
+        setDivisiOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filterDivisi = (query) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return DIVISI_LIST;
+    return DIVISI_LIST.filter((item) => item.toLowerCase().includes(q));
+  };
+
+  const pilihDivisi = (value) => {
+    setForm((previous) => ({ ...previous, target_divisi: value }));
+    setDivisiQuery(value);
+    setDivisiOpen(false);
+    setErrors((previous) => {
+      if (!previous.target_divisi) return previous;
+      const next = { ...previous };
+      delete next.target_divisi;
+      return next;
+    });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting || !session) return;
 
-    const validationErrors = validate(form);
+    setIsSubmitting(true);
+
+    // Pastikan target_divisi terisi dari hasil pencarian
+    let targetDivisiFinal = form.target_divisi;
+    if (form.target_mode === 'divisi') {
+      const matched = DIVISI_LIST.find((item) => item.toLowerCase() === divisiQuery.trim().toLowerCase());
+      if (matched) {
+        targetDivisiFinal = matched;
+      }
+      if (targetDivisiFinal !== form.target_divisi) {
+        setForm((previous) => ({ ...previous, target_divisi: targetDivisiFinal }));
+      }
+      setDivisiQuery(targetDivisiFinal || divisiQuery);
+    }
+
+    const formToValidate = {
+      ...form,
+      target_divisi: form.target_mode === 'divisi' ? targetDivisiFinal : form.target_divisi,
+    };
+
+    const validationErrors = validate(formToValidate);
     setErrors(validationErrors);
     setFormError('');
 
-    if (Object.keys(validationErrors).length > 0) return;
-
-    setIsSubmitting(true);
+    if (Object.keys(validationErrors).length > 0) {
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      const slots = form.slots.map((slot) => ({
+      const slots = formToValidate.slots.map((slot) => ({
         mulai: new Date(slot.mulai).toISOString(),
         selesai: slot.selesai ? new Date(slot.selesai).toISOString() : null,
       }));
@@ -284,10 +358,13 @@ export default function ScheduleForm() {
         .map((slot) => new Date(slot.selesai).getTime());
 
       const payload = {
-        judul: form.judul.trim(),
-        deskripsi: form.deskripsi.trim(),
-        kategori: form.kategori,
-        target_divisi: form.target_mode === 'divisi' ? form.target_divisi : null,
+        judul: formToValidate.judul.trim(),
+        deskripsi: formToValidate.deskripsi.trim(),
+        kategori: formToValidate.kategori,
+        target_divisi:
+          formToValidate.target_mode === 'divisi'
+            ? DIVISI_LIST.find((item) => item.toLowerCase() === divisiQuery.trim().toLowerCase()) || formToValidate.target_divisi || targetDivisiFinal
+            : null,
         waktu_mulai: new Date(Math.min(...startTimes)).toISOString(),
         waktu_selesai: endTimes.length
           ? new Date(Math.max(...endTimes)).toISOString()
@@ -466,24 +543,56 @@ export default function ScheduleForm() {
                 <label htmlFor="target_divisi" className={SUB_LABEL_CLASS}>
                   Divisi Penerima
                 </label>
-                <select
-                  id="target_divisi"
-                  name="target_divisi"
-                  value={form.target_divisi}
-                  onChange={handleChange}
-                  aria-invalid={Boolean(errors.target_divisi)}
-                  aria-describedby={errors.target_divisi ? 'target_divisi-error' : undefined}
-                  className={`${FIELD_BASE_CLASS} ${
-                    errors.target_divisi ? FIELD_INVALID_CLASS : FIELD_OK_CLASS
-                  } ${form.target_divisi ? '' : 'text-bw-muted'}`}
-                >
-                  <option value="">-- Pilih Divisi --</option>
-                  {DIVISI_OPTIONS.map((option) => (
-                    <option key={option} value={option} className="text-bw-ink">
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                <div ref={divisiWrapRef} className="relative">
+                  <input
+                    id="target_divisi"
+                    type="text"
+                    value={divisiQuery}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setDivisiQuery(value);
+                      setDivisiOpen(true);
+                      setForm((previous) => ({ ...previous, target_divisi: '' }));
+                      setErrors((previous) => {
+                        if (!previous.target_divisi) return previous;
+                        const next = { ...previous };
+                        delete next.target_divisi;
+                        return next;
+                      });
+                    }}
+                    onFocus={() => setDivisiOpen(true)}
+                    placeholder="Ketik nama divisi..."
+                    autoComplete="off"
+                    aria-invalid={Boolean(errors.target_divisi)}
+                    aria-describedby={errors.target_divisi ? 'target_divisi-error' : undefined}
+                    className={`${FIELD_BASE_CLASS} ${
+                      errors.target_divisi ? FIELD_INVALID_CLASS : FIELD_OK_CLASS
+                    }`}
+                  />
+                  {divisiOpen && (
+                    <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-bw-line bg-bw-card shadow-card">
+                      <ul className="max-h-56 overflow-auto py-1">
+                        {filterDivisi(divisiQuery).length === 0 ? (
+                          <li className="px-3 py-2 text-xs text-bw-muted">
+                            Tidak ada divisi yang cocok
+                          </li>
+                        ) : (
+                          filterDivisi(divisiQuery).map((option) => (
+                            <li key={option}>
+                              <button
+                                type="button"
+                                onClick={() => pilihDivisi(option)}
+                                className="w-full px-3 py-2 text-left text-sm text-bw-ink transition-colors hover:bg-bw-blue-50"
+                              >
+                                {option}
+                              </button>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
                 <FieldError id="target_divisi-error">{errors.target_divisi}</FieldError>
               </div>
             )}

@@ -12,7 +12,7 @@ function getErrorMessage(error) {
   const message = raw.toLowerCase();
 
   if (message.includes('invalid login credentials')) {
-    return 'Email atau kata sandi salah.';
+    return 'Gmail atau kata sandi salah.';
   }
   if (message.includes('email not confirmed')) {
     return 'Email belum dikonfirmasi. Buka tautan konfirmasi di kotak masuk email Anda.';
@@ -43,8 +43,13 @@ export default function Login() {
 
     setError('');
 
-    if (!email.trim() || !password) {
-      setError('Email dan kata sandi wajib diisi.');
+    const emailTrim = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      setError('Masukkan alamat Gmail yang valid.');
+      return;
+    }
+    if (!password) {
+      setError('Kata sandi wajib diisi.');
       return;
     }
 
@@ -52,7 +57,7 @@ export default function Login() {
 
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: emailTrim,
         password,
       });
 
@@ -79,7 +84,7 @@ export default function Login() {
               Sistem Pengingat Jadwal
             </h1>
             <p className="mt-1 text-xs leading-relaxed text-bw-muted">
-              Gunakan akun yang telah terdaftar untuk melanjutkan.
+              Gunakan Gmail terdaftar dan kata sandi untuk masuk.
             </p>
           </div>
 
@@ -104,7 +109,7 @@ export default function Login() {
 
             <div>
               <label htmlFor="email" className={LABEL_CLASS}>
-                Email
+                Gmail
               </label>
               <input
                 id="email"
@@ -113,7 +118,7 @@ export default function Login() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
-                placeholder="Masukkan email yang terdaftar"
+                placeholder="Masukkan Gmail terdaftar"
                 className={INPUT_CLASS}
               />
             </div>
@@ -149,16 +154,6 @@ export default function Login() {
             >
               {isSubmitting ? 'Memproses...' : 'Masuk'}
             </button>
-
-            <p className="text-center text-xs text-bw-muted">
-              Belum punya akun?{' '}
-              <Link
-                to="/register"
-                className="font-bold text-bw-blue transition-colors hover:text-bw-blue-hi hover:underline"
-              >
-                Daftar di sini
-              </Link>
-            </p>
           </form>
         </div>
 

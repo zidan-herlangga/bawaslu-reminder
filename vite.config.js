@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import notifyHandler from './api/notify.js';
+import pinHandler from './api/pin.js';
+import lupaPasswordHandler from './api/lupa-password.js';
 
 const SERVER_ENV_KEYS = [
   'SUPABASE_URL',
@@ -39,20 +41,26 @@ function readJsonBody(req) {
 // langsung di proses Vite memakai variabel dari file .env.
 // Harus berupa plugin: configureServer adalah hook plugin, bukan opsi `server.*`.
 function localApiPlugin() {
+  const pasang = (server, jalur, handler) => {
+    server.middlewares.use(jalur, (req, res) => {
+      readJsonBody(req)
+        .then(() => handler(req, res))
+        .catch((error) => {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(
+            JSON.stringify({ error: error?.message || 'Gagal memproses permintaan.' })
+          );
+        });
+    });
+  };
+
   return {
     name: 'bawaslu-local-api',
     configureServer(server) {
-      server.middlewares.use('/api/notify', (req, res) => {
-        readJsonBody(req)
-          .then(() => notifyHandler(req, res))
-          .catch((error) => {
-            res.statusCode = 500;
-            res.setHeader('Content-Type', 'application/json; charset=utf-8');
-            res.end(
-              JSON.stringify({ error: error?.message || 'Gagal memproses permintaan.' })
-            );
-          });
-      });
+      pasang(server, '/api/notify', notifyHandler);
+      pasang(server, '/api/pin', pinHandler);
+      pasang(server, '/api/lupa-password', lupaPasswordHandler);
     },
   };
 }

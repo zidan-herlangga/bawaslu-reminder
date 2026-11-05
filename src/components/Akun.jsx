@@ -227,6 +227,47 @@ export default function Akun() {
     setPwMsg({ type: 'ok', text: 'Password berhasil diubah.' });
   };
 
+  const savePin = async (event) => {
+    event.preventDefault();
+    setPinMsg(null);
+
+    if (!/^\d{6}$/.test(pinForm.pin)) {
+      setPinMsg({ type: 'error', text: 'PIN harus 6 digit angka.' });
+      return;
+    }
+    if (pinForm.pin !== pinForm.confirm) {
+      setPinMsg({ type: 'error', text: 'Konfirmasi PIN tidak sama.' });
+      return;
+    }
+
+    setPinSaving(true);
+
+    try {
+      const res = await fetch('/api/pin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: 'set', pin: pinForm.pin }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setPinMsg({ type: 'error', text: data.error || 'Gagal menyimpan PIN.' });
+        return;
+      }
+
+      setPinForm({ pin: '', confirm: '' });
+      setPinMsg({ type: 'ok', text: 'PIN pemulihan berhasil disimpan.' });
+    } catch {
+      setPinMsg({ type: 'error', text: 'Gagal terhubung ke server. Coba lagi.' });
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-card">
@@ -292,7 +333,18 @@ export default function Akun() {
                 }
                 className={FIELD_CLASS}
               >
-                {DIVISI_OPTIONS.map((option) => (
+                {[
+                  'Ketua Bawaslu',
+                  'Koordinator Divisi (Kordiv) SDM, Organisasi, dan Diklat',
+                  'Koordinator Divisi (Kordiv) Pencegahan, Partisipasi Masyarakat, dan Hubungan Antar Lembaga (P2HM)',
+                  'Koordinator Divisi (Kordiv) Penanganan Pelanggaran dan Data & Informasi (Datin)',
+                  'Koordinator Divisi (Kordiv) Hukum dan Penyelesaian Sengketa',
+                  'Kepala Sekretariat (Kaseks)',
+                  'Bendahara / Pengelola Keuangan',
+                  'Staf / Penata Kelola Pengawasan Pemilu',
+                  'Analis Hukum / Analis Pengawasan',
+                  'Staf Pengadministrasian Perkantoran / Umum'
+                ].map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>

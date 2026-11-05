@@ -441,7 +441,7 @@ export default function Dashboard() {
               <article
                 key={schedule.id}
                 className={`group relative overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift ${
-                  sudahLewat ? 'opacity-70' : ''
+                  sudahLewat && schedule.pembuat_id !== session.user.id ? 'opacity-70' : ''
                 }`}
               >
                 <span
@@ -551,31 +551,35 @@ export default function Dashboard() {
                     )}
                     {schedule.pembuat_id === session.user.id && (
                       <div className="mt-2.5 flex flex-col items-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleRemind(schedule)}
-                          disabled={
-                            soundBusy ||
-                            (remind.id === schedule.id && remind.status === 'busy')
-                          }
-                          className="h-11 rounded-xl bg-bw-blue px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
-                        >
-                          {remind.id === schedule.id && remind.status === 'busy'
-                            ? 'Mengirim...'
-                            : 'Ingatkan'}
-                        </button>
+                        {!sudahLewat && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemind(schedule)}
+                            disabled={
+                              soundBusy ||
+                              (remind.id === schedule.id && remind.status === 'busy')
+                            }
+                            className="h-11 rounded-xl bg-bw-blue px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40 disabled:cursor-not-allowed disabled:bg-bw-line disabled:text-bw-muted disabled:shadow-none"
+                          >
+                            {remind.id === schedule.id && remind.status === 'busy'
+                              ? 'Mengirim...'
+                              : 'Ingatkan'}
+                          </button>
+                        )}
 
                         {/* Edit dan Hapus dulunya hanya teks kecil dengan pemisah
                             slash. Keduanya jadi tombol sungguhan supaya target
                             sentuhnya cukup besar dan tidak salah-tekan. */}
                         <div className="flex items-center gap-1.5">
-                          <Link
-                            to={`/jadwal/${schedule.id}/edit`}
-                            aria-label={`Ubah jadwal ${schedule.judul}`}
-                            className="grid h-9 min-w-16 place-items-center rounded-lg px-2 text-xs font-semibold text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
-                          >
-                            Ubah
-                          </Link>
+                          {!sudahLewat && (
+                            <Link
+                              to={`/jadwal/${schedule.id}/edit`}
+                              aria-label={`Ubah jadwal ${schedule.judul}`}
+                              className="grid h-9 min-w-16 place-items-center rounded-lg px-2 text-xs font-semibold text-bw-muted transition-colors hover:bg-bw-blue-50 hover:text-bw-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-bw-blue/40"
+                            >
+                              Ubah
+                            </Link>
+                          )}
                           <button
                             type="button"
                             onClick={() =>

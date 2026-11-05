@@ -36,11 +36,39 @@ export default function ResetPassword() {
       if (active && event === 'PASSWORD_RECOVERY') setPhase('form');
     });
 
-    if (!hasRecoveryHint()) {
-      supabase.auth.getSession().finally(() => {
-        if (active) setPhase((current) => (current === 'checking' ? 'invalid' : current));
-      });
-    }
+    const exchangeCode = async () => {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+
+      if (code) {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          if (active) setPhase('form');
+          url.searchParams.delete('code');
+          window.history.replaceState({}, document.title, url.pathname + url.hash);
+          return;
+        } catch (err) {
+          console.error('[ResetPassword] exchangeCodeForSession gagal:', err?.message);
+          if (active) setPhase('invalid');
+          return;
+        }
+      }
+
+      if (!hasRecoveryHint()) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (active) {
+            if (session) {
+              setPhase('form');
+            } else {
+              setPhase((current) => (current === 'checking' ? 'invalid' : current));
+            }
+          }
+        });
+      }
+    };
+
+    exchangeCode();
 
     return () => {
       active = false;
@@ -70,12 +98,15 @@ export default function ResetPassword() {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
 
-      setNotice('Password berhasil diubah. Mengalihkan ke halaman utama...');
+      setNotice('Password berhasil diubah. Silakan login kembali...');
       setPassword('');
       setConfirm('');
+      try {
+        await supabase.auth.signOut();
+      } catch {}
       timerRef.current = window.setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 1400);
+        navigate('/login', { replace: true, state: { message: 'Password berhasil diubah. Silakan login dengan password baru.' } });
+      }, 1200);
     } catch (updateError) {
       console.error('[ResetPassword] gagal:', updateError?.code, updateError?.message);
       const raw = (updateError?.message ?? '').toLowerCase();

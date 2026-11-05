@@ -5,12 +5,22 @@ create table if not exists public.profiles (
   id          uuid primary key references auth.users (id) on delete cascade,
   nama_lengkap text not null check (length(trim(nama_lengkap)) between 1 and 200),
   email       text not null unique,
+  -- NIP dipakai sebagai nama masuk. Boleh NULL untuk baris lama yang belum punya.
+  nip         varchar(18),
   divisi      text not null check (length(trim(divisi)) > 0),
   jabatan     text not null check (length(trim(jabatan)) > 0),
   role_akses  text not null default 'Staf' check (role_akses = 'Staf'),
   status_akun text not null default 'Aktif' check (status_akun = 'Aktif'),
   created_at  timestamptz not null default now()
 );
+
+-- Migrasi untuk tabel yang sudah terlanjur dibuat sebelum kolom nip ada.
+alter table if exists public.profiles
+  add column if not exists nip varchar(18);
+
+create unique index if not exists profiles_nip_key
+  on public.profiles (nip)
+  where nip is not null;
 
 -- 2. Aktifkan Row Level Security pada profil
 alter table public.profiles enable row level security;

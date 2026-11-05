@@ -12,7 +12,6 @@ const TodoPage = lazy(() => import('./components/TodoPage'));
 const ScheduleForm = lazy(() => import('./components/ScheduleForm'));
 const Akun = lazy(() => import('./components/Akun'));
 const Login = lazy(() => import('./components/Login'));
-const Register = lazy(() => import('./components/Register'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const LupaPassword = lazy(() => import('./components/LupaPassword'));
 
@@ -27,7 +26,6 @@ export default function App() {
         <Route path="/jadwal/:id/edit" element={<ScheduleForm />} />
         <Route path="/akun" element={<Akun />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
         <Route path="/lupa-password" element={<LupaPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />

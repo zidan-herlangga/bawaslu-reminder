@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { DIVISI_SHORT } from '../constants/options';
 import { formatJam, formatTanggalPendek, formatWaktuLengkap } from '../lib/formatWaktu';
-import { getSlots, sesiSelesai, sortSlots } from '../lib/slots';
+import { getSlots, jadwalSelesai, sesiSelesai, sortSlots } from '../lib/slots';
 import AddToCalendar from './AddToCalendar';
 
 // Modal detail jadwal.
@@ -118,6 +118,7 @@ export default function DetailJadwal({
   const pemilik = jadwal.pembuat_id === userId;
   const lewat = sesiTampil ? sesiSelesai(sesiTampil, now) : false;
   const gayaKategori = KATEGORI_STYLE[jadwal.kategori] ?? KATEGORI_STYLE.Lainnya;
+  const semuaSelesai = jadwalSelesai(jadwal, now);
 
   return (
     <div
@@ -277,7 +278,7 @@ export default function DetailJadwal({
         </div>
 
         <footer className="flex flex-wrap items-center gap-2 border-t border-bw-line bg-bw-surface/70 px-5 py-3">
-          {pemilik && onIngatkan && (
+          {pemilik && !semuaSelesai && onIngatkan && (
             <button
               type="button"
               onClick={onIngatkan}
@@ -290,7 +291,7 @@ export default function DetailJadwal({
 
           <AddToCalendar schedule={jadwal} />
 
-          {pemilik && onUbah && (
+          {pemilik && !semuaSelesai && onUbah && (
             <button type="button" onClick={onUbah} className={`${TOMBOL} border border-bw-line bg-bw-card text-bw-ink hover:bg-bw-surface`}>
               Ubah
             </button>
