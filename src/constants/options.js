@@ -29,6 +29,9 @@ export const JABATAN_OPTIONS = [
 
 export const KATEGORI_OPTIONS = ['Rapat', 'Tugas', 'Pengawasan', 'Lainnya'];
 
+export const ROLE_AKSES_OPTIONS = ['Admin', 'User'];
+export const STATUS_AKUN_OPTIONS = ['Aktif', 'Nonaktif'];
+
 export const MIN_PASSWORD_LENGTH = 6;
 
 export const NOTIFICATION_LEAD_MINUTES = 15;

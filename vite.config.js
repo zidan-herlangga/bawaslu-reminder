@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import notifyHandler from './api/notify.js';
 import pinHandler from './api/pin.js';
 import lupaPasswordHandler from './api/lupa-password.js';
+import adminUsersHandler from './api/admin/users.js';
 
 const SERVER_ENV_KEYS = [
   'SUPABASE_URL',
@@ -61,6 +62,7 @@ function localApiPlugin() {
       pasang(server, '/api/notify', notifyHandler);
       pasang(server, '/api/pin', pinHandler);
       pasang(server, '/api/lupa-password', lupaPasswordHandler);
+      pasang(server, '/api/admin/users', adminUsersHandler);
     },
   };
 }

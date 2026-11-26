@@ -165,7 +165,7 @@ export default function Register() {
         email,
         divisi: form.divisi,
         jabatan: form.jabatan,
-        role_akses: 'Staf',
+        role_akses: 'User',
         status_akun: 'Aktif',
       });
 

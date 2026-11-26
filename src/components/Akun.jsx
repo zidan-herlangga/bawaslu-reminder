@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useSession from '../hooks/useSession';
 import useDueReminder from '../hooks/useDueReminder';
@@ -173,7 +174,7 @@ export default function Akun() {
             id: session.user.id,
             email: session.user.email,
             ...changes,
-            role_akses: 'Staf',
+            role_akses: 'User',
             status_akun: 'Aktif',
           })
           .select(PROFILE_COLUMNS);
@@ -227,47 +228,6 @@ export default function Akun() {
     setPwMsg({ type: 'ok', text: 'Password berhasil diubah.' });
   };
 
-  const savePin = async (event) => {
-    event.preventDefault();
-    setPinMsg(null);
-
-    if (!/^\d{6}$/.test(pinForm.pin)) {
-      setPinMsg({ type: 'error', text: 'PIN harus 6 digit angka.' });
-      return;
-    }
-    if (pinForm.pin !== pinForm.confirm) {
-      setPinMsg({ type: 'error', text: 'Konfirmasi PIN tidak sama.' });
-      return;
-    }
-
-    setPinSaving(true);
-
-    try {
-      const res = await fetch('/api/pin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ action: 'set', pin: pinForm.pin }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setPinMsg({ type: 'error', text: data.error || 'Gagal menyimpan PIN.' });
-        return;
-      }
-
-      setPinForm({ pin: '', confirm: '' });
-      setPinMsg({ type: 'ok', text: 'PIN pemulihan berhasil disimpan.' });
-    } catch {
-      setPinMsg({ type: 'error', text: 'Gagal terhubung ke server. Coba lagi.' });
-    } finally {
-      setPinSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-3xl border border-bw-line bg-bw-card shadow-card">
@@ -279,7 +239,7 @@ export default function Akun() {
             <p className="truncate font-display text-[15px] font-bold text-bw-ink">{nama}</p>
             <p className="truncate text-xs text-bw-muted">{session.user.email}</p>
             <span className="mt-1 inline-block rounded-full bg-bw-red-solid px-2 py-0.5 text-xs font-bold text-white">
-              {profile?.role_akses || 'Staf'}
+              {profile?.role_akses || 'User'}
             </span>
           </div>
           <button
@@ -404,10 +364,31 @@ export default function Akun() {
         )}
       </section>
 
+      {profile?.role_akses === 'Admin' && profile?.status_akun === 'Aktif' && (
+        <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
+                Admin
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-bw-muted">
+                Kelola akun pengguna, role, status, dan reset password.
+              </p>
+            </div>
+            <Link
+              to="/admin/pengguna"
+              className="rounded-xl bg-bw-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-bw-blue-hi focus:outline-none focus:ring-2 focus:ring-bw-blue/40"
+            >
+              Kelola Pengguna
+            </Link>
+          </div>
+        </section>
+      )}
+
       <section className="rounded-3xl border border-bw-line bg-bw-card p-4 shadow-card">
         <div className="flex items-start justify-between gap-3">
           <h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-bw-ink">
-            Staf Aktif
+            Pengguna Aktif
           </h2>
           <span
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${

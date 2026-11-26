@@ -9,8 +9,8 @@ create table if not exists public.profiles (
   nip         varchar(18),
   divisi      text not null check (length(trim(divisi)) > 0),
   jabatan     text not null check (length(trim(jabatan)) > 0),
-  role_akses  text not null default 'Staf' check (role_akses = 'Staf'),
-  status_akun text not null default 'Aktif' check (status_akun = 'Aktif'),
+  role_akses  text not null default 'User' check (role_akses in ('Admin', 'User')),
+  status_akun text not null default 'Aktif' check (status_akun in ('Aktif', 'Nonaktif')),
   created_at  timestamptz not null default now()
 );
 
@@ -29,27 +29,70 @@ alter table public.profiles enable row level security;
 drop policy if exists "insert own profile" on public.profiles;
 create policy "insert own profile"
   on public.profiles for insert
-  with check (auth.uid() = id);
+  to authenticated
+  with check (
+    auth.uid() = id
+    and role_akses = 'User'
+    and status_akun = 'Aktif'
+  );
+
+-- 2d. Helper admin (SECURITY DEFINER agar tidak rekursif di RLS).
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role_akses = 'Admin'
+      and p.status_akun = 'Aktif'
+  );
+$$;
+
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
 
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile"
   on public.profiles for select
+  to authenticated
   using (auth.uid() = id);
 
 drop policy if exists "update own profile" on public.profiles;
 create policy "update own profile"
   on public.profiles for update
+  to authenticated
   using (auth.uid() = id)
   with check (
     auth.uid() = id
-    and role_akses = 'Staf'
+    and role_akses = case when public.is_admin() then 'Admin' else 'User' end
     and status_akun = 'Aktif'
   );
 
 drop policy if exists "delete own profile" on public.profiles;
 create policy "delete own profile"
   on public.profiles for delete
+  to authenticated
   using (auth.uid() = id);
+
+-- 2e. Admin aktif boleh mengubah profil pengguna lain.
+drop policy if exists "admin update any profile" on public.profiles;
+create policy "admin update any profile"
+  on public.profiles for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- 2f. Admin aktif boleh membuat profil (fallback; utama lewat API service role).
+drop policy if exists "admin insert profile" on public.profiles;
+create policy "admin insert profile"
+  on public.profiles for insert
+  to authenticated
+  with check (public.is_admin());
 
 -- =====================================================================
 -- 4. Tabel jadwal
@@ -167,7 +210,7 @@ create policy "delete own schedule"
 --     new.email,
 --     coalesce(new.raw_user_meta_data ->> 'divisi', ''),
 --     coalesce(new.raw_user_meta_data ->> 'jabatan', ''),
---     'Staf',
+--     'User',
 --     'Aktif'
 --   )
 --   on conflict (id) do nothing;

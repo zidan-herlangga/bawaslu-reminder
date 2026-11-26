@@ -56,12 +56,28 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: emailTrim,
         password,
       });
 
       if (signInError) throw signInError;
+
+      const userId = data?.user?.id ?? data?.session?.user?.id;
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('status_akun')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (profile?.status_akun === 'Nonaktif') {
+          await supabase.auth.signOut();
+          setError('Akun Anda dinonaktifkan. Hubungi admin.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       console.info('[Login] sukses, navigasi ke /');
       navigate('/', { replace: true });

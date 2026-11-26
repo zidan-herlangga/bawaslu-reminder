@@ -1,11 +1,12 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
 import { PresenceProvider } from '../lib/presenceContext';
 import ThemeToggle from './ThemeToggle';
 import useSession from '../hooks/useSession';
 import { useOnline } from '../hooks/useOnline';
 import { supabase } from '../lib/supabase';
+import fetchProfile from '../lib/fetchProfile';
 import { enablePush, ensurePushSubscription, isPushReady, notifyNow } from '../lib/push';
 import {
   hasSoundActivation,
@@ -208,6 +209,31 @@ export default function AppShell() {
   // Supabase menyegarkan token, jadi memakainya sebagai dependensi membuat
   // kanal dibuat ulang terus-menerus.
   const userId = session?.user?.id ?? null;
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+    if (!session?.user) return () => { active = false; };
+
+    fetchProfile(session)
+      .then(async (profile) => {
+        if (!active) return;
+        if (profile?.status_akun === 'Nonaktif') {
+          await supabase.auth.signOut();
+          navigate('/login', {
+            replace: true,
+            state: { message: 'Akun Anda dinonaktifkan. Hubungi admin.' },
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('[AppShell] gagal memeriksa status akun:', error?.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id, navigate]);
 
   useEffect(() => subscribeSound(setSoundOn), []);
   useEffect(() => subscribeSoundBusy(setSoundBusy), []);

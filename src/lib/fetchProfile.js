@@ -34,7 +34,7 @@ export default async function fetchProfile(session) {
 async function loadProfile(session) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('nama_lengkap, divisi, jabatan, role_akses, status_akun')
+    .select('id, nama_lengkap, divisi, jabatan, role_akses, status_akun, email')
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -46,11 +46,13 @@ async function loadProfile(session) {
 
   const meta = session.user.user_metadata ?? {};
   const fallback = {
+    id: session.user.id,
     nama_lengkap: meta.nama_lengkap ?? session.user.email ?? '',
     divisi: meta.divisi ?? 'Belum diatur',
     jabatan: meta.jabatan ?? 'Belum diatur',
-    role_akses: 'Staf',
+    role_akses: 'User',
     status_akun: 'Aktif',
+    email: session.user.email ?? '',
   };
 
   // Pendaftaran dengan konfirmasi email tidak menyisipkan baris profiles
